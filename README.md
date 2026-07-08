@@ -33,7 +33,7 @@ By the end, you won't just understand how grounded AI pipelines work — **you'l
 
 | # | chapter | what it's about |
 |:-:|---------|------------------|
-| 01 | 🧨 [The Hallucination Problem](chapters/chapter-01-the-hallucination-problem.md) | Why an LLM without grounding and validation is a liability generator, not a content tool. |
+| 01 | 🧨 [The Hallucination Problem](chapters/chapter-01-hallucination-problem.md) | Why an LLM without grounding and validation is a liability generator, not a content tool. |
 | 02 | 🧠 [Choosing and Installing Your Local Model](chapters/chapter-02-choosing-and-installing-your-local-model.md) | Matching a model to your hardware and task instead of chasing the trending name. |
 | 03 | ⌨️ [Talking to Your Model in Code, Not Chat](chapters/chapter-03-talking-to-your-model-in-code-not-chat.md) | Moving from the chat window to scripted API calls — the foundation of a repeatable pipeline. |
 | 04 | 🕸️ [Gathering Real-World Source Material](chapters/chapter-04-gathering-real-world-source-material.md) | Disciplined, targeted scraping of a few good sources instead of bulk-downloading the internet. |
