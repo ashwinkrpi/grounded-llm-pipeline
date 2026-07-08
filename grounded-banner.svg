@@ -1,0 +1,88 @@
+<svg viewBox="0 0 1200 400" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0A1F16"/>
+      <stop offset="100%" stop-color="#0F2A1D"/>
+    </linearGradient>
+    <pattern id="dots" width="26" height="26" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="1.2" fill="#C08A3E" opacity="0.14"/>
+    </pattern>
+    <filter id="softGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- background -->
+  <rect width="1200" height="400" fill="url(#bg)"/>
+  <rect width="1200" height="400" fill="url(#dots)"/>
+
+  <!-- faint border frame, like a PCB edge -->
+  <rect x="14" y="14" width="1172" height="372" fill="none" stroke="#C08A3E" stroke-opacity="0.25" stroke-width="1.5"/>
+
+  <!-- eyebrow -->
+  <text x="60" y="72" font-family="ui-monospace, 'SF Mono', 'Cascadia Code', 'JetBrains Mono', Consolas, monospace"
+        font-size="15" letter-spacing="4" fill="#C08A3E">A LOCAL AI PIPELINE BOOK</text>
+
+  <!-- title -->
+  <text x="58" y="152" font-family="ui-monospace, 'SF Mono', 'Cascadia Code', 'JetBrains Mono', Consolas, monospace"
+        font-size="76" font-weight="700" fill="#EDE6D6" filter="url(#softGlow)">GROUNDED</text>
+
+  <!-- subtitle -->
+  <text x="60" y="188" font-family="-apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
+        font-size="21" font-style="italic" fill="#9FBFAA">Building a Local AI Pipeline That Never Lies</text>
+
+  <!-- stat line -->
+  <text x="60" y="224" font-family="ui-monospace, 'SF Mono', 'Cascadia Code', 'JetBrains Mono', Consolas, monospace"
+        font-size="14" letter-spacing="2" fill="#C08A3E" opacity="0.9">11 CHAPTERS · 5 FILES · $0 CLOUD COST</text>
+
+  <!-- ===== circuit trace: the five pipeline files ===== -->
+  <!-- main trace line -->
+  <path d="M 100 320 L 280 320 L 460 320 L 640 320 L 820 320 L 940 320"
+        fill="none" stroke="#C08A3E" stroke-width="2.5"/>
+
+  <!-- rejected-claim branch, between VALIDATE and RENDER -->
+  <path d="M 730 320 L 730 356" fill="none" stroke="#E0A458" stroke-width="2" stroke-dasharray="3 3"/>
+  <line x1="723" y1="356" x2="737" y2="370" stroke="#E0A458" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="737" y1="356" x2="723" y2="370" stroke="#E0A458" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="730" y="388" text-anchor="middle" font-family="ui-monospace, 'SF Mono', Consolas, monospace"
+        font-size="11" font-style="italic" fill="#E0A458" opacity="0.85">unfounded claim, rejected</text>
+
+  <!-- five nodes -->
+  <g font-family="ui-monospace, 'SF Mono', Consolas, monospace" font-size="12" fill="#EDE6D6" opacity="0.9">
+    <g transform="translate(100,320)">
+      <rect x="-8" y="-8" width="16" height="16" transform="rotate(45)" fill="#0F2A1D" stroke="#C08A3E" stroke-width="2"/>
+      <text x="0" y="-22" text-anchor="middle">SCRAPE</text>
+    </g>
+    <g transform="translate(280,320)">
+      <rect x="-8" y="-8" width="16" height="16" transform="rotate(45)" fill="#0F2A1D" stroke="#C08A3E" stroke-width="2"/>
+      <text x="0" y="-22" text-anchor="middle">STRUCTURE</text>
+    </g>
+    <g transform="translate(460,320)">
+      <rect x="-8" y="-8" width="16" height="16" transform="rotate(45)" fill="#0F2A1D" stroke="#C08A3E" stroke-width="2"/>
+      <text x="0" y="-22" text-anchor="middle">GENERATE</text>
+    </g>
+    <g transform="translate(640,320)">
+      <rect x="-8" y="-8" width="16" height="16" transform="rotate(45)" fill="#0F2A1D" stroke="#C08A3E" stroke-width="2"/>
+      <text x="0" y="-22" text-anchor="middle">VALIDATE</text>
+    </g>
+    <g transform="translate(820,320)">
+      <rect x="-8" y="-8" width="16" height="16" transform="rotate(45)" fill="#0F2A1D" stroke="#C08A3E" stroke-width="2"/>
+      <text x="0" y="-22" text-anchor="middle">RENDER</text>
+    </g>
+  </g>
+
+  <!-- ground symbol: the validated, trustworthy output -->
+  <g transform="translate(940,320)" stroke="#6FCF97" stroke-width="3" stroke-linecap="round" filter="url(#softGlow)">
+    <line x1="0" y1="0" x2="40" y2="0"/>
+    <line x1="40" y1="-22" x2="40" y2="22"/>
+    <line x1="52" y1="-15" x2="52" y2="15"/>
+    <line x1="64" y1="-8" x2="64" y2="8"/>
+  </g>
+  <text x="985" y="358" text-anchor="middle" font-family="ui-monospace, 'SF Mono', Consolas, monospace"
+        font-size="12" letter-spacing="1" fill="#6FCF97" opacity="0.95">GROUNDED OUTPUT</text>
+
+</svg>
