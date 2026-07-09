@@ -1,3 +1,9 @@
+<!--
+© 2026 ashwinkrpi. Licensed under CC BY-NC-SA 4.0.
+Full terms: https://creativecommons.org/licenses/by-nc-sa/4.0/
+Code samples in this chapter are licensed separately under MIT — see /LICENSE.
+-->
+
 # Chapter 11: Adapting the Pipeline to Your Own Niche
 
 ## The Recipe Blog That Ran on the Exact Same Code as the RBI Pipeline

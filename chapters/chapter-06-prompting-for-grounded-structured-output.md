@@ -1,3 +1,9 @@
+<!--
+© 2026 ashwinkrpi. Licensed under CC BY-NC-SA 4.0.
+Full terms: https://creativecommons.org/licenses/by-nc-sa/4.0/
+Code samples in this chapter are licensed separately under MIT — see /LICENSE.
+-->
+
 # Chapter 6: Prompting for Grounded, Structured Output
 
 ## The Prompt That Had the Right Answer Sitting Right In Front of It — and Ignored It Anyway

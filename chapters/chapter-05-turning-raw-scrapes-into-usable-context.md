@@ -1,3 +1,9 @@
+<!--
+© 2026 ashwinkrpi. Licensed under CC BY-NC-SA 4.0.
+Full terms: https://creativecommons.org/licenses/by-nc-sa/4.0/
+Code samples in this chapter are licensed separately under MIT — see /LICENSE.
+-->
+
 # Chapter 5: Turning Raw Scrapes into Usable Context
 
 ## The Model That Summarized a Cookie Banner Instead of the News

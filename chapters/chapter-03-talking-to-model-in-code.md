@@ -1,3 +1,9 @@
+<!--
+© 2026 ashwinkrpi. Licensed under CC BY-NC-SA 4.0.
+Full terms: https://creativecommons.org/licenses/by-nc-sa/4.0/
+Code samples in this chapter are licensed separately under MIT — see /LICENSE.
+-->
+
 # Chapter 3: Talking to Your Model in Code, Not Chat
 
 ## The Pipeline That Broke Because a Human Wasn't Home
@@ -71,6 +77,8 @@ consecutive meeting.
 ```
 
 Same answer. Except now, nobody typed anything into a chat window. This is a function — `ask_model()` — that any other piece of code can call, anytime, with any prompt, and get a clean answer back automatically. This one function, sitting quietly in one file, is the actual foundation this entire book is built on top of. Every later chapter — the validator checking claims, the renderer turning text into a graphic, the scheduler running everything at midnight — all of it is going to reach for a function exactly like this one, instead of a human typing into a window.
+
+One quick heads-up before moving on: a few upcoming chapters will show commands like `python3 talk_to_model.py --prompt-file strong_prompt.txt --source pib_release.txt`. That's shorthand for "call `ask_model()` with a prompt built from that file and check it against that source" — it's describing the *behavior*, not a command-line flag this exact script has. Chapter 9 is where `talk_to_model.py` actually gets built out into its permanent, pipeline-ready form (renamed `generate.py`, with a proper `build_prompt()` function alongside `ask_model()`), so don't worry if you try one of those flagged commands here and it doesn't run — that's expected at this stage.
 
 ## The Objection: "Can't I Just Copy-Paste From the Chat Window Into My Script?"
 

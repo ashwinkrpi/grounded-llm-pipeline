@@ -1,3 +1,9 @@
+<!--
+© 2026 ashwinkrpi. Licensed under CC BY-NC-SA 4.0.
+Full terms: https://creativecommons.org/licenses/by-nc-sa/4.0/
+Code samples in this chapter are licensed separately under MIT — see /LICENSE.
+-->
+
 # Chapter 9: Wiring the Five Files Together
 
 ## The Script That Died Silently at 3 AM and Took Everything Down With It
@@ -34,7 +40,38 @@ One crash, zero output, and — this is the part that actually stings — zero c
 
 Here's the core idea this chapter is built on, and it's worth stating plainly: this pipeline's reliability doesn't come from clever code. It comes from strict separation — scrape does only scraping, structure does only cleaning and chunking, generate does only prompting and asking the model, validate does only checking citations, and render does only turning approved text into an image. Each file has exactly one job, takes a clearly defined input, and produces a clearly defined output. And — this is the part most beginners skip — each file has to fail *loudly* and *specifically* when its one job can't be done, instead of quietly passing along an empty string or a `None` and letting some unrelated file downstream take the blame.
 
-Let's rebuild this properly. Here's `scrape.py`, doing only scraping, and refusing to pretend everything's fine when it isn't:
+Before rebuilding this properly, it's worth being upfront about something: the five files below aren't new code appearing out of nowhere. They're the exact same functions from Chapters 4 through 8, given permanent homes. A few of them need one small addition to actually slot into an orchestrator, so let's be explicit about the mapping instead of pretending it was always this tidy:
+
+- Chapter 4's `targeted_scrape.py` becomes **`scrape.py`** — same scraping logic, now wrapped in a proper `scrape_source()` function with a real exception instead of a script that just prints results.
+- Chapter 5's `clean_text.py` and `chunk_text.py` — two separate files — merge into one file, **`structure.py`**, because cleaning and chunking are really one job ("turn raw scrape into usable context"), just done in two steps. `clean_article()` and `chunk_text()` from Chapter 5 are still in there; they've just moved in together.
+- Chapter 3's `talk_to_model.py` becomes **`generate.py`**. Its `ask_model()` function moves over unchanged. But `generate.py` also needs one thing Chapter 3 never actually built as reusable code: a `build_prompt()` function that assembles Chapter 6's grounding rules — the "quote the exact source phrase in brackets, or say 'Not stated in source'" instructions — around whatever chunk gets handed to it. Chapter 6 showed you *what* that prompt needs to say; here's it actually turned into a function:
+
+```python
+# generate.py
+import requests
+
+def ask_model(prompt, model="llama3.2:3b"):
+    response = requests.post(
+        "http://localhost:11434/api/generate",
+        json={"model": model, "prompt": prompt, "stream": False}
+    )
+    return response.json()["response"]
+
+def build_prompt(source_chunk):
+    return f"""You are answering strictly from the SOURCE text below. Rules:
+1. Only state facts that appear word-for-word or near word-for-word in SOURCE.
+2. For every fact you state, quote the exact phrase from SOURCE it came from, in brackets.
+3. If SOURCE does not contain the answer, respond with exactly: 'Not stated in source.'
+4. Do not add outlook, predictions, or analysis not present in SOURCE.
+
+SOURCE: {source_chunk}
+
+QUESTION: Summarize the key fact in this source."""
+```
+
+That's the whole reconciliation. Nothing about *what* any of these functions do has changed since the chapter that built them — they've just been given the permanent, single-job file structure this chapter is arguing for. From here on, `scrape.py`, `structure.py`, and `generate.py` are the real names you'll keep using.
+
+Here's `scrape.py`, doing only scraping, and refusing to pretend everything's fine when it isn't:
 
 ```python
 # scrape.py

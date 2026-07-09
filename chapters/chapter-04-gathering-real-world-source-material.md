@@ -1,3 +1,9 @@
+<!--
+© 2026 ashwinkrpi. Licensed under CC BY-NC-SA 4.0.
+Full terms: https://creativecommons.org/licenses/by-nc-sa/4.0/
+Code samples in this chapter are licensed separately under MIT — see /LICENSE.
+-->
+
 # Chapter 4: Gathering Real-World Source Material
 
 ## The Guy Who Scraped 4,000 Pages and Got Worse Results Than the Guy Who Scraped 5
