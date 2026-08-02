@@ -18,7 +18,7 @@ source = \"The Reserve Bank's Monetary Policy Committee voted 5-1 to hold the re
 print(validate_response(answer, source))
 "
 
-{'status': 'approved', 'citations': [{'quote': 'voted 5-1 to hold 
+{'status': 'approved', 'citations': [{'quote': 'voted 5-1 to hold
 the repo rate steady', 'valid': True, 'score': 1.0}]}
 ```
 
@@ -28,10 +28,10 @@ the repo rate steady', 'valid': True, 'score': 1.0}]}
 
 Here's the mental shift this chapter needs you to make: everything up to this point in the pipeline has been optimized for one thing — truth. Getting a sentence that's actually grounded, actually checkable, actually real. But truth and shareability are two completely separate problems, and solving one does nothing for the other. A verified sentence sitting in a variable isn't a finished piece of content any more than a verified ingredient list is a finished meal. Something still has to actually cook it into a form a person would want to consume.
 
-Let's prove this by actually building that last step — turning your approved sentence into something you could genuinely post. We'll use Pillow, Python's image library, to render a simple, clean content card:
+Let's prove this by actually building that last step — turning your approved sentence into something you could genuinely post. We'll use Pillow, Python's image library, to render a simple, clean content card. The permanent version of this module lives at [`code/render_card.py`](../code/render_card.py).
 
 ```python
-# render_card.py
+# render_card.py — full file: code/render_card.py
 from PIL import Image, ImageDraw, ImageFont
 import textwrap
 
@@ -40,26 +40,27 @@ def render_card(headline, source_name, output_path="output_card.png"):
     bg_color = (18, 18, 20)
     text_color = (240, 240, 240)
     accent_color = (110, 200, 255)
-    
+
     img = Image.new("RGB", (width, height), bg_color)
     draw = ImageDraw.Draw(img)
-    
+
     # fonts — swap paths for whatever's actually on your Pi
+    # (macOS/Windows paths differ; see code/render_card.py for fallbacks)
     headline_font = ImageFont.truetype(
         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 58)
     source_font = ImageFont.truetype(
         "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 32)
-    
+
     # wrap headline text so it doesn't run off the card
     wrapped = textwrap.fill(headline, width=24)
     draw.multiline_text((80, 320), wrapped, font=headline_font,
                          fill=text_color, spacing=18)
-    
+
     # accent line + source attribution at the bottom
     draw.rectangle([(80, 880), (200, 886)], fill=accent_color)
     draw.text((80, 920), f"Source: {source_name}", font=source_font,
                fill=accent_color)
-    
+
     img.save(output_path)
     return output_path
 
@@ -73,7 +74,7 @@ if __name__ == "__main__":
 ```
 
 ```bash
-$ python3 render_card.py
+$ python3 code/render_card.py
 
 Saved to output_card.png
 ```
@@ -81,6 +82,20 @@ Saved to output_card.png
 Open that file and you've genuinely got something different now — a dark, clean, square image, headline text wrapped and sized properly, a small accent line, and a clear source credit at the bottom. Same exact sentence as the JSON dictionary from earlier. Completely different object. One was proof. This is a product.
 
 Notice something important about what this script did and didn't do. It didn't touch the wording — the headline text going in is exactly the validated sentence from Chapter 7, untouched. Rendering isn't a place where you get to loosen up and let the model "punch up" the copy for style, because the moment you do that, you've reopened the exact door Chapter 7 just spent a whole chapter closing. Rendering only handles *presentation* — layout, color, font, size, credit line — never the actual words. That separation is deliberate, and it's going to matter even more in the next chapter, when this rendering step becomes its own dedicated file with exactly one job.
+
+## Where This Fits in the Final Pipeline
+
+By the end of Chapter 9, this module is one of the five permanent stages:
+
+| Stage | File | Job |
+|-------|------|-----|
+| Scrape | [`scrape.py`](../code/scrape.py) | Pull real source material |
+| Structure | [`structure.py`](../code/structure.py) | Clean and chunk |
+| Generate | [`generate.py`](../code/generate.py) | Grounded prompt + model call |
+| Validate | [`validator.py`](../code/validator.py), [`validate_response.py`](../code/validate_response.py) | Reject ungrounded claims |
+| **Render** | [`render_card.py`](../code/render_card.py) | **Turn approved text into a finished card** |
+
+The orchestrator [`run_pipeline.py`](../code/run_pipeline.py) only calls `render_card()` after validation has returned `"approved"`. Failed or rejected runs never reach this stage — which is exactly what you want. You never render a sentence you don't trust.
 
 ## The Objection: "Why Not Just Post the Text Directly — Isn't an Image Just Extra Work?"
 
@@ -90,10 +105,22 @@ Worth testing this honestly instead of assuming images always win. If your actua
 
 There's a second, quieter reason rendering matters even on text-friendly platforms: a rendered card carries its source citation as a permanent, visible part of the artifact itself — that small "Source: Reserve Bank of India, Official Release" line baked directly into the image. A plain text post can have its source line deleted, edited out, or stripped when someone screenshots and reshares it without the original caption. An image with the citation rendered into the pixels themselves keeps that accountability attached, no matter how far it travels from your original post. That's not decoration — that's Chapter 7's validation work, made portable.
 
+## Font Paths Across Machines
+
+The example above uses DejaVu paths common on Raspberry Pi / Debian / Ubuntu. The full [`code/render_card.py`](../code/render_card.py) includes fallbacks for other systems (Liberation fonts, macOS Arial, Windows Arial). If you hit a missing-font error:
+
+1. Check what is installed: `fc-list : family | head`
+2. Point the `ImageFont.truetype(...)` calls at a real `.ttf` on your machine, or
+3. Rely on the fallbacks already in the permanent module.
+
+Rendering still never changes the words — only how they are drawn.
+
 ## Chapter Summary
 
 Passing validation makes a sentence true. It doesn't make it something anyone will actually stop and read. Turning verified text into an actual rendered artifact — a card, an image, something with layout and visual weight — is a separate, necessary step that this pipeline can't skip, and it comes with one hard rule: rendering handles presentation only, never wording, because touching the words at this stage would undo everything Chapters 6 and 7 just secured. Plain text still has its place on genuinely text-native platforms, but on anything visual, and for anywhere you want the source citation to travel permanently with the content, rendering is what actually makes the truth land.
 
+The permanent render module is [`code/render_card.py`](../code/render_card.py). In Chapter 9 it is wired in as the final stage of [`run_pipeline.py`](../code/run_pipeline.py), and only runs after validation has approved the text.
+
 ## Bridge to Chapter 9
 
-Stop and count what you've actually built across these last five chapters: a scraper, a cleaner, a chunker, a grounded prompt generator, a validator, and now a renderer. Six real, working pieces, each one proven separately, each one sitting in its own script file on your machine right now. But right now, they're just... sitting there. Separately. You've been running each one by hand, one at a time, checking each output before moving to the next. That's fine for building and testing — it's exactly how you should build anything new. It is not a pipeline. A pipeline means these six pieces hand data to each other automatically, in order, without you manually copying an output from one script into the input of the next. Making that actually happen — cleanly, reliably, in a way that doesn't quietly break when one piece fails — is the whole job of the next chapter.
+Stop and count what you've actually built across these last five chapters: a scraper, a cleaner, a chunker, a grounded prompt generator, a validator, and now a renderer. Six real, working pieces, each one proven separately, each one sitting in its own script file on your machine right now. But right now, they're just... sitting there. Separately. You've been running each one by hand, one at a time, checking each output before moving to the next. That's fine for building and testing — it's exactly how you should build anything new. It is not a pipeline. A pipeline means these pieces hand data to each other automatically, in order, without you manually copying an output from one script into the input of the next. Making that actually happen — cleanly, reliably, in a way that doesn't quietly break when one piece fails — is the whole job of the next chapter.

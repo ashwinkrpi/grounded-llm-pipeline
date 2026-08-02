@@ -13,16 +13,16 @@ Here's something that'll mess with your head a little. Take the cleaned, chunked
 ```bash
 $ python3 talk_to_model.py
 
-Context: "The Monetary Policy Committee decided to keep the policy 
-repo rate unchanged at 6.5%, citing continued vigilance on 
+Context: "The Monetary Policy Committee decided to keep the policy
+repo rate unchanged at 6.5%, citing continued vigilance on
 inflation."
 
-Question: What is the current repo rate, and what's the outlook 
+Question: What is the current repo rate, and what's the outlook
 for the next quarter?
 
-Answer: The repo rate currently stands at 6.5%. Looking ahead, 
-analysts expect the RBI may consider a rate cut in the next quarter 
-if inflation continues to moderate, potentially bringing rates down 
+Answer: The repo rate currently stands at 6.5%. Looking ahead,
+analysts expect the RBI may consider a rate cut in the next quarter
+if inflation continues to moderate, potentially bringing rates down
 to around 6.25% to support economic growth.
 ```
 
@@ -41,16 +41,16 @@ Let's prove the difference with three prompt attempts, same context, same questi
 ```bash
 $ python3 talk_to_model.py --prompt-file weak_prompt.txt
 
-Prompt: "Using the context below, answer the question. Try to stick 
+Prompt: "Using the context below, answer the question. Try to stick
 to the facts given.
 
-Context: The Monetary Policy Committee decided to keep the policy 
+Context: The Monetary Policy Committee decided to keep the policy
 repo rate unchanged at 6.5%.
 
 Question: What's the repo rate outlook?"
 
-Answer: The repo rate is currently 6.5%. The RBI is likely to 
-maintain a cautious stance, and many economists anticipate rate 
+Answer: The repo rate is currently 6.5%. The RBI is likely to
+maintain a cautious stance, and many economists anticipate rate
 cuts later this year as inflation trends improve.
 ```
 
@@ -61,11 +61,11 @@ Still wandering. "Try to stick to the facts" reads to the model like a mild sugg
 ```bash
 $ python3 talk_to_model.py --prompt-file medium_prompt.txt
 
-Prompt: "Answer ONLY using information directly stated in the 
-context. If the answer is not in the context, respond with exactly: 
+Prompt: "Answer ONLY using information directly stated in the
+context. If the answer is not in the context, respond with exactly:
 'Not stated in source.'
 
-Context: The Monetary Policy Committee decided to keep the policy 
+Context: The Monetary Policy Committee decided to keep the policy
 repo rate unchanged at 6.5%.
 
 Question: What's the repo rate outlook?"
@@ -80,28 +80,54 @@ Now we're getting somewhere. That instruction — a specific, exact fallback phr
 ```bash
 $ python3 talk_to_model.py --prompt-file strong_prompt.txt
 
-Prompt: "You are answering strictly from the SOURCE text below. 
+Prompt: "You are answering strictly from the SOURCE text below.
 Rules:
-1. Only state facts that appear word-for-word or near word-for-word 
+1. Only state facts that appear word-for-word or near word-for-word
    in SOURCE.
-2. For every fact you state, quote the exact phrase from SOURCE it 
+2. For every fact you state, quote the exact phrase from SOURCE it
    came from, in brackets.
-3. If SOURCE does not contain the answer, respond with exactly: 
+3. If SOURCE does not contain the answer, respond with exactly:
    'Not stated in source.'
-4. Do not add outlook, predictions, or analysis not present in 
+4. Do not add outlook, predictions, or analysis not present in
    SOURCE.
 
-SOURCE: The Monetary Policy Committee decided to keep the policy 
-repo rate unchanged at 6.5%, citing continued vigilance on 
+SOURCE: The Monetary Policy Committee decided to keep the policy
+repo rate unchanged at 6.5%, citing continued vigilance on
 inflation.
 
 QUESTION: What's the repo rate outlook?"
 
-Answer: The current repo rate is 6.5% [the policy repo rate 
+Answer: The current repo rate is 6.5% [the policy repo rate
 unchanged at 6.5%]. Not stated in source regarding future outlook.
 ```
 
 This is the shape this book's pipeline actually runs on. Notice what changed — the model isn't just answering, it's showing its work, pointing at the exact phrase from SOURCE that backs up each claim it makes. That bracketed quote isn't decoration. It's the exact thing Chapter 7's validator is going to grab and mechanically check against your cleaned, chunked text — did this phrase actually appear in the source, or didn't it? A prompt built like this doesn't just make hallucination less likely. It makes every claim independently checkable, which is a completely different and much stronger guarantee.
+
+## From Teaching Script to Permanent Module
+
+In Chapter 3 you called the model through `talk_to_model.py`. In the final pipeline that becomes [`code/generate.py`](../code/generate.py), which holds two functions:
+
+- `ask_model(prompt)` — the HTTP call to Ollama (unchanged idea from Chapter 3)
+- `build_prompt(source_chunk, question=...)` — assembles the strong grounding rules above around whatever chunk Chapter 5 produced
+
+```python
+# generate.py — excerpt; full file: code/generate.py
+def build_prompt(source_chunk, question=None):
+    if question is None:
+        question = "Summarize the key fact in this source."
+
+    return f"""You are answering strictly from the SOURCE text below. Rules:
+1. Only state facts that appear word-for-word or near word-for-word in SOURCE.
+2. For every fact you state, quote the exact phrase from SOURCE it came from, in brackets.
+3. If SOURCE does not contain the answer, respond with exactly: 'Not stated in source.'
+4. Do not add outlook, predictions, or analysis not present in SOURCE.
+
+SOURCE: {source_chunk}
+
+QUESTION: {question}"""
+```
+
+Chapter 9's orchestrator [`run_pipeline.py`](../code/run_pipeline.py) calls `build_prompt(chunks[0])` then `ask_model(...)`. You do not need the `--prompt-file` style flags from the teaching examples once you are on the permanent modules — those were shorthand for "behavior," not a finished CLI.
 
 ## The Objection: "Doesn't All This Rule-Writing Make the Output Sound Robotic and Stiff?"
 
@@ -112,28 +138,44 @@ Let's actually test it rather than assume:
 ```bash
 $ python3 talk_to_model.py --prompt-file strong_prompt_v2.txt
 
-Prompt: "...same grounding rules as before, but write the final 
-answer in a natural, conversational tone, as if explaining to a 
-friend. Keep the bracketed source quotes, but write everything 
+Prompt: "...same grounding rules as before, but write the final
+answer in a natural, conversational tone, as if explaining to a
+friend. Keep the bracketed source quotes, but write everything
 around them casually.
 
-SOURCE: The Monetary Policy Committee decided to keep the policy 
-repo rate unchanged at 6.5%, citing continued vigilance on 
+SOURCE: The Monetary Policy Committee decided to keep the policy
+repo rate unchanged at 6.5%, citing continued vigilance on
 inflation.
 
 QUESTION: What's happening with the repo rate?"
 
-Answer: So the RBI basically decided not to touch the repo rate 
-this time — it's staying right at 6.5% [the policy repo rate 
-unchanged at 6.5%], mainly because they're still keeping a close 
+Answer: So the RBI basically decided not to touch the repo rate
+this time — it's staying right at 6.5% [the policy repo rate
+unchanged at 6.5%], mainly because they're still keeping a close
 eye on inflation [citing continued vigilance on inflation].
 ```
 
 Same grounding rules, same bracketed quotes backing every claim — but the actual sentence reads completely naturally, not stiff at all. The rules about staying inside the source and the rules about tone are two separate, independent things, and they don't fight each other. You can absolutely be strict about *what* the model is allowed to claim, while being loose about *how* it phrases that claim. What was actually making attempt one and two feel a bit clunky wasn't the grounding discipline — it was that those early prompts hadn't been given any instruction about tone at all, so the model defaulted to a flat, textbook-summary voice. Add tone instructions on top of grounding instructions, and you get both: strictly accurate, and genuinely readable. This book's own Gen-Z, explain-to-a-friend voice, in fact, comes from stacking exactly this kind of tone instruction on top of grounding rules — the two were never in conflict to begin with.
 
+The permanent [`build_prompt()`](../code/generate.py) can include a tone line the same way; accuracy and style stay independent dials.
+
+## Where This Fits in the Final Pipeline
+
+| Stage | File | Job |
+|-------|------|-----|
+| Scrape | [`scrape.py`](../code/scrape.py) | Pull real source material |
+| Structure | [`structure.py`](../code/structure.py) | Clean and chunk |
+| **Generate** | [`generate.py`](../code/generate.py) | **Grounded prompt + model call** |
+| Validate | [`validator.py`](../code/validator.py), [`validate_response.py`](../code/validate_response.py) | Reject ungrounded claims |
+| Render | [`render_card.py`](../code/render_card.py) | Turn approved text into a card |
+
+Chapter 7 will treat every `[bracketed]` phrase this prompt produces as a claim to check — not as proof. That is why the brackets exist.
+
 ## Chapter Summary
 
 A prompt in this pipeline isn't just a question you're asking your model — it's a fence you're building around what the model is allowed to say. A polite request to "stick to the facts" doesn't hold up against the model's natural instinct to keep a plausible-sounding answer going. A hard rule — quote the exact source phrase for every claim, or say a fixed fallback sentence when the source doesn't cover it — actually holds, and it produces something extra valuable: every claim now comes bracketed with the exact source text it's based on, which is precisely what the next chapter's validator needs to do its job. And strict grounding rules don't force robotic writing — tone and accuracy are separate dials, and you can turn both up at once.
+
+Permanent home for this logic: [`code/generate.py`](../code/generate.py) (`build_prompt` + `ask_model`).
 
 ## Bridge to Chapter 7
 

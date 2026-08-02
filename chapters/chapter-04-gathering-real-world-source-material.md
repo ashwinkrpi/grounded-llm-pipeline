@@ -21,7 +21,7 @@ Let's get one thing straight before touching any code: the entire point of scrap
 Let's prove this with a real example. Say your pipeline covers Indian financial news. Here's a scraper that goes broad — hits a general aggregator, grabs whatever's on the page:
 
 ```python
-# broad_scrape.py — the "grab everything" approach
+# broad_scrape.py — the "grab everything" approach (teaching example only)
 import requests
 from bs4 import BeautifulSoup
 
@@ -48,41 +48,59 @@ Found 187 headlines
 
 187 headlines, and already, five lines in, you can see the problem — recipes and cricket scores sitting right next to actual monetary policy news, because the aggregator mixes categories loosely and your scraper grabbed everything with a `headline` class, no matter the topic. Multiply this by 187, and you've got a pile that needs heavy manual sorting before it's usable for anything.
 
-Now here's the disciplined version — same tools, completely different targeting:
+Now here's the disciplined version — same tools, completely different targeting. In the final pipeline this becomes [`code/scrape.py`](../code/scrape.py):
 
 ```python
-# targeted_scrape.py — the "few, good sources" approach
+# scrape.py — excerpt; full file: code/scrape.py
 import requests
 from bs4 import BeautifulSoup
 
+class ScrapeError(Exception):
+    pass
+
+def scrape_source(url, timeout=10):
+    try:
+        page = requests.get(
+            url,
+            headers={"User-Agent": "Mozilla/5.0 (compatible; GroundedPipeline/1.0)"},
+            timeout=timeout,
+        )
+        page.raise_for_status()
+    except requests.RequestException as e:
+        raise ScrapeError(f"Could not reach {url}: {e}") from e
+
+    soup = BeautifulSoup(page.text, "html.parser")
+    article = soup.find("article")
+    if not article:
+        article = soup.find("main") or soup.find(class_="content") or soup.find("body")
+
+    if not article or not article.get_text(strip=True):
+        raise ScrapeError(
+            f"No article content found at {url} — page layout may have changed"
+        )
+
+    return page.text
+```
+
+Teaching example with explicit primary sources (same idea Chapter 4 started with):
+
+```python
+# targeted approach — few, good sources
 SOURCES = [
     "https://www.rbi.org.in/Scripts/BS_PressReleaseDisplay.aspx",
     "https://pib.gov.in/PressReleseDetail.aspx",  # official govt releases
 ]
 
 for url in SOURCES:
-    page = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
-    soup = BeautifulSoup(page.text, "html.parser")
-    title = soup.find("h1") or soup.find("title")
-    print(f"Source: {url}")
-    print(f"Title: {title.get_text(strip=True) if title else 'N/A'}")
-    print("---")
-```
-
-```bash
-$ python3 targeted_scrape.py
-
-Source: https://www.rbi.org.in/Scripts/BS_PressReleaseDisplay.aspx
-Title: Reserve Bank of India - Press Releases
----
-Source: https://pib.gov.in/PressReleseDetail.aspx
-Title: Press Information Bureau - Government of India
----
+    # in the permanent pipeline you call scrape_source(url) from code/scrape.py
+    print(f"Would scrape: {url}")
 ```
 
 Only two sources here, not 187. But look at what those two actually are — the RBI's own press release page, and the Press Information Bureau, which is the Indian government's own official release platform. Every single line that comes off these pages is, by definition, a primary source — nobody's paraphrase, nobody's hot take, nobody's clickbait rewrite. When your model later generates "the RBI kept the repo rate at 6.5%," it's pointing back at a sentence from the RBI's actual press release, not at some random aggregator's rewrite of a rewrite of that same press release. That's the difference between real grounding and fake grounding — and it has nothing to do with how much you scraped. It has everything to do with what you chose to scrape.
 
 This is worth sitting with for a second, because it's genuinely counterintuitive if you're coming from a "more data is always better" mindset that a lot of AI content assumes. In this pipeline specifically, a scraper touching two verified, official sources beats a scraper touching two hundred random ones, every single time, because Chapter 7's validator can only be as good as the source material it's checking against. Feed it clean sources, it catches real hallucinations. Feed it messy, unreliable sources, and it'll happily "validate" a claim against a source that was itself wrong to begin with — which means your validator isn't protecting you anymore, it's just rubber-stamping bad information with extra confidence.
+
+If the page is down or the layout changed so no article content exists, [`scrape_source`](../code/scrape.py) raises `ScrapeError` instead of returning empty HTML. Chapter 9's orchestrator catches that and prints `[STAGE: scrape] FAILED` with a clear reason.
 
 ## The Objection: "Won't Scraping More Sites Give Me Better Coverage?"
 
@@ -104,9 +122,25 @@ Out of 340 headlines pulled from twelve sites, only 71 actually survive basic cl
 
 The honest answer is: coverage isn't about the number of sites, it's about the *type* of sites. Two official, primary sources will usually give you cleaner, more usable material than twelve mixed general-purpose ones, because the twelve are mostly reporting on the same two or three primary events anyway — just with more noise wrapped around them. If you genuinely need broader coverage later, the right move isn't "scrape more sites blindly." It's "add one more carefully chosen, high-quality source to your list," the same disciplined way you picked the first two. Quality compounds. Volume just piles up.
 
+## Where This Fits in the Final Pipeline
+
+| Stage | File | Job |
+|-------|------|-----|
+| **Scrape** | [`scrape.py`](../code/scrape.py) | **Pull real source material** |
+| Structure | [`structure.py`](../code/structure.py) | Clean and chunk |
+| Generate | [`generate.py`](../code/generate.py) | Grounded prompt + model call |
+| Validate | [`validator.py`](../code/validator.py), [`validate_response.py`](../code/validate_response.py) | Reject ungrounded claims |
+| Render | [`render_card.py`](../code/render_card.py) | Turn approved text into a card |
+
+[`run_pipeline.py`](../code/run_pipeline.py) calls `scrape_source(url)` as Stage 1. The teaching scripts `broad_scrape.py`, `targeted_scrape.py`, and `wide_scrape.py` were for learning the contrast; the permanent module is only [`code/scrape.py`](../code/scrape.py).
+
+When you adapt the pipeline to a new niche in Chapter 11, this is one of the two places you change: the URL(s) you pass in. The scraping logic itself stays the same.
+
 ## Chapter Summary
 
 Scraping for this pipeline isn't a data-collection exercise — it's a trust exercise. Grabbing everything a broad aggregator offers looks like progress but actually hands you duplicates, unrelated junk, and unreliable rewrites that undermine your validator before it even starts working. A small, deliberately chosen list of primary, official, or clearly trustworthy sources gives you less volume but far higher usability, because every line you scrape is something your model can honestly point back to later. And scraping more sites doesn't automatically mean better coverage — it usually just means more repetition of the same handful of real stories, wrapped in noise you then have to clean up by hand.
+
+Permanent home for this stage: [`code/scrape.py`](../code/scrape.py).
 
 ## Bridge to Chapter 5
 

@@ -13,7 +13,7 @@ Let's do a small experiment first, no cap. Open your local model — doesn't mat
 ```bash
 $ ollama run llama3.1
 
->>> What was the closing price of Nvidia stock on March 14, 2024, 
+>>> What was the closing price of Nvidia stock on March 14, 2024,
 >>> and who was the CEO who announced their Q4 earnings that quarter?
 
 Nvidia's stock closed at $926.69 on March 14, 2024. CEO Jensen Huang
@@ -34,8 +34,8 @@ First reaction everyone has — "oh it's just a prompting issue na, I'll just te
 Let's try:
 
 ```bash
->>> Only answer with verified facts. If you are not certain, say 
->>> "I don't know." What was Nvidia's closing stock price on 
+>>> Only answer with verified facts. If you are not certain, say
+>>> "I don't know." What was Nvidia's closing stock price on
 >>> March 14, 2024?
 
 Nvidia's stock closed at approximately $926.69 on March 14, 2024.
@@ -57,6 +57,22 @@ The second you automate that loop, hallucination stops being a small annoyance a
 
 So the bar for this pipeline can't just be "the model tries its best to be accurate." It has to be built into the structure itself: **nothing the model generates makes it to the final output unless it can be matched back to a real source you actually collected.** Not "the model was told to be careful." Not "the model sounded confident." Actually matched, mechanically, to real text you scraped. This isn't a prompt trick — it's a design decision. That's exactly why this pipeline has a scraping stage, a cleaning stage, and — this is the important one — a full chapter (Chapter 7) dedicated purely to a validator whose only job is checking every single claim against the source and throwing it out if it doesn't match.
 
+## How the Rest of the Book Fixes This
+
+There is no permanent code file in this chapter — the problem is conceptual. The fix is the five-stage pipeline you will assemble by Chapter 9:
+
+| Stage | File | How it fights hallucination |
+|-------|------|-----------------------------|
+| Scrape | [`scrape.py`](../code/scrape.py) | Only real, chosen sources — not the model's memory |
+| Structure | [`structure.py`](../code/structure.py) | Clean, chunked context the model must work from |
+| Generate | [`generate.py`](../code/generate.py) | Prompts that force bracketed source quotes |
+| Validate | [`validator.py`](../code/validator.py), [`validate_response.py`](../code/validate_response.py) | Mechanical check: does this quote exist in the source? |
+| Render | [`render_card.py`](../code/render_card.py) | Only approved text becomes a finished artifact |
+
+Wired together by [`run_pipeline.py`](../code/run_pipeline.py), scheduled and watched in Chapter 10 ([`check_last_run.py`](../code/check_last_run.py)), and reused for any niche in Chapter 11.
+
+The model's job is never to be trusted on its own. The structure is what makes the output trustworthy.
+
 ## The Obvious Question: "Won't a Bigger, Better Model Just Fix This?"
 
 Fair question, and worth actually answering properly, because a lot of people assume yes and get burned later.
@@ -69,7 +85,7 @@ There's a second reason this matters specifically for you: you're not picking a 
 
 An LLM without proper grounding isn't just unreliable sometimes — it genuinely can't tell you when it's making something up, because generating something believable and remembering something true happen through the exact same process inside it. Telling it to "be careful" doesn't fix that, because there's no internal signal separating confident guessing from confident recall. This becomes a real danger specifically when you automate things — when content goes out without you checking every piece — which is literally what this book is teaching you to build. And no, a bigger, better model doesn't solve this either; the real fix is to stop trusting the model as the source of truth at all, and instead build a pipeline where every single claim has to survive being checked against a real source before it ever reaches your final output.
 
-That's basically the whole book, said as a problem instead of a solution: get real material, make the model generate only from it, then check mechanically that it actually did. Every chapter from here is one piece of building that system.
+That's basically the whole book, said as a problem instead of a solution: get real material, make the model generate only from it, then check mechanically that it actually did. Every chapter from here is one piece of building that system. The assembled code lives in [`code/`](../code/).
 
 ## Bridge to Chapter 2
 

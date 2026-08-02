@@ -13,9 +13,9 @@ Let's start with something that actually happened, and honestly, will probably h
 ```bash
 $ python3 talk_to_model.py --input raw_rbi_page.html
 
-This page requires JavaScript to be enabled. Please accept cookies 
-to continue viewing content. Skip to main content. Home | About Us 
-| Press Releases | Contact. The website uses cookies to enhance 
+This page requires JavaScript to be enabled. Please accept cookies
+to continue viewing content. Skip to main content. Home | About Us
+| Press Releases | Contact. The website uses cookies to enhance
 your experience.
 ```
 
@@ -37,9 +37,9 @@ raw_html = """
 <header><img src="logo.png"></header>
 <article>
   <h1>RBI Monetary Policy Statement</h1>
-  <p>The Monetary Policy Committee decided to keep the policy repo 
+  <p>The Monetary Policy Committee decided to keep the policy repo
   rate unchanged at 6.5%, citing continued vigilance on inflation.</p>
-  <p>This marks the eighth consecutive meeting where rates were held 
+  <p>This marks the eighth consecutive meeting where rates were held
   steady, reflecting a cautious approach to economic growth.</p>
 </article>
 <footer>© 2026 Reserve Bank of India | Privacy Policy | Sitemap</footer>
@@ -47,81 +47,71 @@ raw_html = """
 """
 ```
 
-Now let's write the cleaner — the code that separates the one paragraph you actually want from everything wrapped around it:
+In the early chapters this logic lived in separate teaching scripts (`clean_text.py`, `chunk_text.py`). In the final pipeline they merge into one module with one job: turn raw scrape into usable context. That module is [`code/structure.py`](../code/structure.py).
 
 ```python
-# clean_text.py
+# structure.py — excerpt; full file: code/structure.py
 from bs4 import BeautifulSoup
 
-def clean_article(raw_html):
+class StructureError(Exception):
+    pass
+
+def clean_and_chunk(raw_html, chunk_size=300, overlap=50):
     soup = BeautifulSoup(raw_html, "html.parser")
-    
+
     # strip out the stuff that's never the actual content
     for tag in soup(["nav", "header", "footer", "script", "style"]):
         tag.decompose()
     for tag in soup.find_all(class_="cookie-banner"):
         tag.decompose()
-    
-    # pull text only from the actual article body
+
     article = soup.find("article")
     if not article:
-        return ""
-    
+        raise StructureError("No <article> tag found after cleaning")
+
     paragraphs = [p.get_text(strip=True) for p in article.find_all("p")]
-    return "\n".join(p for p in paragraphs if len(p) > 20)  # drop junk lines
+    text = "\n".join(p for p in paragraphs if len(p) > 20)
+    if not text:
+        raise StructureError("Article found but contained no usable paragraphs")
 
-if __name__ == "__main__":
-    cleaned = clean_article(raw_html)
-    print(cleaned)
-```
-
-```bash
-$ python3 clean_text.py
-
-The Monetary Policy Committee decided to keep the policy repo rate 
-unchanged at 6.5%, citing continued vigilance on inflation.
-This marks the eighth consecutive meeting where rates were held 
-steady, reflecting a cautious approach to economic growth.
-```
-
-That's it. No nav bar, no cookie banner, no footer, no script tags. Two real sentences, both of them actually from the article. Feed this into your model instead of the raw page, and suddenly it has nothing left to accidentally summarize except the thing you actually wanted summarized.
-
-But cleaning alone isn't the whole story, and here's the part that trips people up next. Real articles — especially official press releases — often run long. Ten paragraphs, fifteen paragraphs, sometimes more. If you dump all of that into one prompt as a single giant block, two things go wrong. First, small local models like the one you picked in Chapter 2 have a limited context window — feed them too much text at once and they either truncate it silently or start losing track of what's actually important. Second, and this matters even more for Chapter 7's validator later, if your model generates a claim and you're trying to check "does this match the source," you need to know *which specific piece* of the source it came from — not just "somewhere in this wall of text." That's what chunking solves.
-
-```python
-# chunk_text.py
-def chunk_text(text, chunk_size=300, overlap=50):
+    # chunk with small overlap so ideas aren't cut mid-sentence
     words = text.split()
-    chunks = []
-    start = 0
+    chunks, start = [], 0
     while start < len(words):
         end = start + chunk_size
-        chunk = " ".join(words[start:end])
-        chunks.append(chunk)
-        start = end - overlap  # small overlap so context isn't cut mid-idea
-    return chunks
-
-if __name__ == "__main__":
-    cleaned = clean_article(raw_html)
-    chunks = chunk_text(cleaned, chunk_size=15, overlap=3)
-    for i, c in enumerate(chunks):
-        print(f"--- Chunk {i+1} ---")
-        print(c)
+        chunks.append(" ".join(words[start:end]))
+        start = end - overlap
+    return text, chunks
 ```
 
 ```bash
-$ python3 chunk_text.py
+$ python3 -c "
+from structure import clean_and_chunk
+raw = open('raw_rbi_page.html').read()  # or the string above
+text, chunks = clean_and_chunk(raw, chunk_size=15, overlap=3)
+print(text)
+print('---')
+for i, c in enumerate(chunks):
+    print(f'Chunk {i+1}: {c}')
+"
 
---- Chunk 1 ---
-The Monetary Policy Committee decided to keep the policy repo rate 
-unchanged at 6.5%, citing continued vigilance on inflation. This 
+The Monetary Policy Committee decided to keep the policy repo rate
+unchanged at 6.5%, citing continued vigilance on inflation.
+This marks the eighth consecutive meeting where rates were held
+steady, reflecting a cautious approach to economic growth.
+---
+Chunk 1: The Monetary Policy Committee decided to keep the policy repo rate
+unchanged at 6.5%, citing continued vigilance on inflation. This
 marks the eighth consecutive
---- Chunk 2 ---
-inflation. This marks the eighth consecutive meeting where rates 
+Chunk 2: inflation. This marks the eighth consecutive meeting where rates
 were held steady, reflecting a cautious approach to economic growth.
 ```
 
-Notice the small overlap between chunk 1 and chunk 2 — the phrase "This marks the eighth consecutive" appears at the tail of one chunk and the start of the next. That's deliberate, not a bug. Without that overlap, you risk slicing a sentence exactly in half between two chunks, so neither chunk fully contains the idea on its own. With it, every real idea in your source text is guaranteed to sit fully inside at least one chunk. Each of these chunks can now be handed to your model as a labeled, traceable piece of context — and just as importantly, each one can later be handed to your Chapter 7 validator as a specific, checkable unit, instead of one giant unsearchable wall of text.
+That's it. No nav bar, no cookie banner, no footer, no script tags. Real sentences, both of them actually from the article. Feed this into your model instead of the raw page, and suddenly it has nothing left to accidentally summarize except the thing you actually wanted summarized.
+
+Notice the small overlap between chunk 1 and chunk 2 — the phrase "This marks the eighth consecutive" appears at the tail of one chunk and the start of the next. That's deliberate, not a bug. Without that overlap, you risk slicing a sentence exactly in half between two chunks, so neither chunk fully contains the idea on its own. With it, every real idea in your source text is guaranteed to sit fully inside at least one chunk. Each of these chunks can now be handed to your model as a labeled, traceable piece of context — and just as importantly, each one can later be handed to Chapter 7's validator as a specific, checkable unit, instead of one giant unsearchable wall of text.
+
+If cleaning fails (no article tag, no usable paragraphs), [`structure.py`](../code/structure.py) raises `StructureError` instead of returning empty strings. Chapter 9's orchestrator catches that and prints `[STAGE: structure] FAILED` with a clear reason — the same "fail loudly" rule as every other stage.
 
 ## The Objection: "Can't I Just Use a Model With a Bigger Context Window and Skip All This?"
 
@@ -132,10 +122,10 @@ Let's actually test that logic:
 ```bash
 $ python3 talk_to_model.py --input raw_rbi_page.html --model llama3.2:3b
 
-Summary: The website discusses cookie policies and provides 
-navigation options including Home, About Us, Press Releases, and 
-Contact. It also mentions the Reserve Bank of India's monetary 
-policy regarding interest rates, though specific figures were not 
+Summary: The website discusses cookie policies and provides
+navigation options including Home, About Us, Press Releases, and
+Contact. It also mentions the Reserve Bank of India's monetary
+policy regarding interest rates, though specific figures were not
 clearly highlighted in the provided content.
 ```
 
@@ -143,9 +133,23 @@ Even with room to spare in the context window, the actual number — 6.5% — go
 
 There's a second reason this matters even more for this book's pipeline specifically: bigger context windows generally mean bigger models, and bigger models mean the exact RAM problem from Chapter 2 all over again. You picked a small model on purpose, to fit your Pi. Cleaning and chunking isn't a workaround for a limitation — it's the actual correct approach regardless of model size, because even a massive frontier model with a huge context window still can't tell a cookie banner from a policy statement on its own. It just has more room to be confused in.
 
+## Where This Fits in the Final Pipeline
+
+| Stage | File | Job |
+|-------|------|-----|
+| Scrape | [`scrape.py`](../code/scrape.py) | Pull real source material |
+| **Structure** | [`structure.py`](../code/structure.py) | **Clean and chunk** |
+| Generate | [`generate.py`](../code/generate.py) | Grounded prompt + model call |
+| Validate | [`validator.py`](../code/validator.py), [`validate_response.py`](../code/validate_response.py) | Reject ungrounded claims |
+| Render | [`render_card.py`](../code/render_card.py) | Turn approved text into a card |
+
+[`run_pipeline.py`](../code/run_pipeline.py) calls `clean_and_chunk(raw)` right after a successful scrape and passes the cleaned text + first chunk downstream. Teaching scripts like `clean_text.py` and `chunk_text.py` were stepping stones; you do not need them once you are on the permanent module.
+
 ## Chapter Summary
 
 Raw scraped HTML isn't usable context — it's a pile of navigation menus, cookie banners, and footers with your actual content buried somewhere inside, and a model treats all of it with equal seriousness unless you clean it first. Stripping out the non-content tags and pulling text only from the real article body turns that mess into something worth feeding to a model. Chunking that cleaned text into smaller, slightly overlapping pieces solves a second problem entirely — it keeps each idea intact, keeps your model from losing track inside long text, and gives Chapter 7's validator specific, traceable pieces to check claims against later. And a bigger context window doesn't replace any of this — it just gives the model more space to be confused in, if you skip the cleanup.
+
+Permanent home for this stage: [`code/structure.py`](../code/structure.py).
 
 ## Bridge to Chapter 6
 

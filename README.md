@@ -22,7 +22,7 @@ You own a Raspberry Pi (or any modest home machine). You've heard of local LLMs 
 
 > This book walks you through building a complete, **five-stage local AI pipeline**: scrape real sources, feed grounded context to a local model, validate every generated claim against its source, and render the result into a finished, postable artifact. All on your own hardware. Zero cloud API cost. Zero invented facts slipping through.
 
-By the end, you won't just understand how grounded AI pipelines work — **you'll have one running on your own machine**, ready to adapt to any niche you care about. 🚀
+By the end, you won't just understand how grounded AI pipelines work — **you'll have one running on your own machine**, ready to adapt to any niche you care about.
 
 ---
 
@@ -63,6 +63,8 @@ By the end of this book, you'll have **five working files** that form a complete
 
 **No cloud APIs. No subscription costs. No hallucinated facts.**
 
+The final assembled code lives in the [`code/`](code/) directory (see that folder’s README for how to run it).
+
 ---
 
 ## ⚙️ requirements
@@ -70,9 +72,23 @@ By the end of this book, you'll have **five working files** that form a complete
 - 🥧 A Raspberry Pi or similar modest home machine (a laptop works too)
 - 🦙 [Ollama](https://ollama.com) or another local LLM runtime
 - ⌨️ Basic comfort with the command line *(no prior scripting experience required — the book teaches it)*
+- Python 3.9+ and the packages listed in `code/requirements.txt`
 
 ---
 
 ## 📄 license
 
-See [LICENSE](LICENSE) for details.
+- **Book text (chapters):** [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/)  
+  © 2026 Ashwin Koppam Raghavendra
+- **Code samples and the `code/` pipeline:** [MIT](LICENSE)
+
+See the license header at the top of each chapter and the root `LICENSE` file for details.
+
+---
+
+## 🚀 how to use this repo
+
+1. Read the chapters in order — each builds on the previous one.
+2. Type the code yourself as you go (the learning happens in the typing).
+3. When you reach Chapter 9, switch to the assembled files in `code/` and run the full pipeline.
+4. Adapt the two knobs (source URLs + question) for your own niche (Chapter 11).

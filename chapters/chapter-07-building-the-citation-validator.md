@@ -13,14 +13,14 @@ Go back to that bracketed quote from the end of Chapter 6 — `[the policy repo 
 ```bash
 $ python3 talk_to_model.py --prompt-file strong_prompt.txt --source pib_release.txt
 
-SOURCE: "The Reserve Bank's Monetary Policy Committee voted 5-1 to 
-hold the repo rate steady, with the majority citing food price 
+SOURCE: "The Reserve Bank's Monetary Policy Committee voted 5-1 to
+hold the repo rate steady, with the majority citing food price
 pressures as the key concern going into the festive season."
 
 QUESTION: What was the vote outcome and the main reason?
 
-Answer: The MPC voted to hold the repo rate steady [the policy 
-repo rate unchanged at 6.5%], citing continued vigilance on 
+Answer: The MPC voted to hold the repo rate steady [the policy
+repo rate unchanged at 6.5%], citing continued vigilance on
 inflation as the main concern.
 ```
 
@@ -32,8 +32,10 @@ This is the moment this whole book has been building toward, and it's worth sitt
 
 Here's the core shift this chapter is asking you to make: stop treating the model's bracketed citation as proof, and start treating it as a claim — one single thing left to verify, using plain code, against the actual text you scraped and cleaned back in Chapters 4 and 5. This is deliberately dumb, mechanical work. Not another model. Not another prompt. A simple, boring, reliable check: does this exact bracketed phrase actually appear in the source text, yes or no?
 
+The permanent low-level matcher lives in [`code/validator.py`](../code/validator.py):
+
 ```python
-# validator.py
+# validator.py — full file: code/validator.py
 from difflib import SequenceMatcher
 
 def validate_citation(quote, source_text, threshold=0.85):
@@ -41,26 +43,26 @@ def validate_citation(quote, source_text, threshold=0.85):
     allowing minor wording differences (punctuation, casing)."""
     quote_clean = quote.lower().strip()
     source_clean = source_text.lower()
-    
+
     if quote_clean in source_clean:
         return True, 1.0  # exact match, no ambiguity
-    
+
     # sliding window check for near-exact matches
     words = source_clean.split()
     window_size = len(quote_clean.split())
-    best_score = 0
+    best_score = 0.0
     for i in range(len(words) - window_size + 1):
         window = " ".join(words[i:i + window_size])
         score = SequenceMatcher(None, quote_clean, window).ratio()
         best_score = max(best_score, score)
-    
+
     return best_score >= threshold, best_score
 ```
 
 Now let's run both citations from this chapter through it — the real one, and the fake one — against their actual sources:
 
 ```python
-# check_both.py
+# check_both.py — demo only; not part of the permanent pipeline
 from validator import validate_citation
 
 source_ch6 = ("The Monetary Policy Committee decided to keep the "
@@ -93,23 +95,25 @@ Checking the same citation against the wrong source:
 
 There it is, in black and white. Same bracketed phrase, two different outcomes, because the validator isn't judging how confident or fluent the model sounded — it's mechanically checking whether those specific words genuinely exist in that specific source. `(True, 1.0)` means an exact match, no ambiguity. `(False, 0.41)` means the phrase and the source barely resemble each other at all — a citation that got reused where it didn't belong, caught cold, with no room for the model to talk its way out of it, because it isn't the model doing the judging anymore.
 
-Now wire this into the actual pipeline logic — the part that decides what's allowed to survive:
+## Wiring Validation into the Pipeline
+
+The stage-level function that decides what's allowed to survive lives in [`code/validate_response.py`](../code/validate_response.py). It pulls every `[bracketed]` citation out of the model answer and runs each one through `validate_citation`:
 
 ```python
-# validate_response.py
+# validate_response.py — full file: code/validate_response.py
 import re
 from validator import validate_citation
 
-def validate_response(answer, source_text):
+def validate_response(answer, source_text, threshold=0.85):
     citations = re.findall(r"\[(.*?)\]", answer)
     if not citations:
-        return {"status": "rejected", "reason": "no citations found"}
-    
+        return {"status": "rejected", "reason": "no citations found", "citations": []}
+
     results = []
     for quote in citations:
-        valid, score = validate_citation(quote, source_text)
+        valid, score = validate_citation(quote, source_text, threshold=threshold)
         results.append({"quote": quote, "valid": valid, "score": round(score, 2)})
-    
+
     if all(r["valid"] for r in results):
         return {"status": "approved", "citations": results}
     else:
@@ -124,11 +128,25 @@ source = \"The Reserve Bank's Monetary Policy Committee voted 5-1 to hold the re
 print(validate_response(answer, source))
 "
 
-{'status': 'rejected', 'citations': [{'quote': 'the policy repo 
+{'status': 'rejected', 'citations': [{'quote': 'the policy repo
 rate unchanged at 6.5%', 'valid': False, 'score': 0.41}]}
 ```
 
 `rejected`. Not flagged for a human to maybe glance at later — actually rejected, automatically, before it goes anywhere near your final artifact in Chapter 8. This is the whole point of this chapter, made concrete: the validator doesn't care how confident the sentence sounded, how well-formatted the bracket was, or how close the number "felt" to being right. It checks one narrow, boring, mechanical thing — does this exact text exist in this exact source — and it rejects anything that fails, no exceptions, no benefit of the doubt. That's the actual trust boundary of this entire pipeline. Everything before this chapter was about giving the model good material and good instructions. This chapter is about no longer needing to hope the model followed them.
+
+## Where This Fits in the Final Pipeline
+
+By the end of Chapter 9, validation is Stage 4 of five:
+
+| Stage | File | Job |
+|-------|------|-----|
+| Scrape | [`scrape.py`](../code/scrape.py) | Pull real source material |
+| Structure | [`structure.py`](../code/structure.py) | Clean and chunk |
+| Generate | [`generate.py`](../code/generate.py) | Grounded prompt + model call |
+| **Validate** | [`validator.py`](../code/validator.py), [`validate_response.py`](../code/validate_response.py) | **Reject ungrounded claims** |
+| Render | [`render_card.py`](../code/render_card.py) | Turn approved text into a card |
+
+The orchestrator [`run_pipeline.py`](../code/run_pipeline.py) only proceeds to render when `validate_response` returns `"approved"`. Anything else stops the run with a clear `[STAGE: validate] REJECTED` line.
 
 ## The Objection: "Isn't a Strict Word-Match Validator Going to Reject Perfectly Good Paraphrases?"
 
@@ -164,9 +182,16 @@ print(validate_citation(paraphrase, source, threshold=0.55))
 
 Now it passes — but notice, you had to consciously choose to loosen the net, with a specific number, that you can see and justify. That's a completely different thing from a validator that quietly accepts anything plausible-sounding by default. The strictness isn't a flaw to apologize for. It's the entire feature. A validator that lets things through easily isn't protecting you from anything — it's just Chapter 1's hallucination problem wearing a lab coat.
 
+In Chapter 11 you'll reuse the same dial when the stakes of a new niche change — tighter for health or legal claims, slightly looser for recipes — without rewriting a single line of matching logic.
+
 ## Chapter Summary
 
 A bracketed citation from your model looks like proof, but it's still just a claim — and Chapter 6 already showed that a model told to cite sources will sometimes cite something that sounds right instead of something that's actually there. The fix isn't a smarter prompt or a bigger model — it's a separate, mechanical validator that checks each citation, word for word, against your real cleaned source text, and rejects anything that doesn't genuinely match, no matter how fluent or confident it sounds. Strict word-matching does risk rejecting valid paraphrases, but this pipeline sidesteps that by forcing the model to quote exactly inside its brackets in the first place — and where looser matching is genuinely needed, you lower the threshold on purpose, not by accident.
+
+Permanent files:
+
+- [`code/validator.py`](../code/validator.py) — `validate_citation()`
+- [`code/validate_response.py`](../code/validate_response.py) — extract brackets, approve or reject
 
 ## Bridge to Chapter 8
 

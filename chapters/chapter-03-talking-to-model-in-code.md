@@ -32,23 +32,25 @@ That's your model, sitting there, ready to be talked to — not through a chat w
 ```bash
 $ curl http://localhost:11434/api/generate -d '{
   "model": "llama3.2:3b",
-  "prompt": "Summarize in one sentence: The RBI kept the repo rate 
+  "prompt": "Summarize in one sentence: The RBI kept the repo rate
   unchanged at 6.5% for the eighth straight meeting.",
   "stream": false
 }'
 
 {"model":"llama3.2:3b","created_at":"2026-07-09T04:12:08Z",
-"response":"The RBI held the repo rate steady at 6.5% for the 
+"response":"The RBI held the repo rate steady at 6.5% for the
 eighth consecutive meeting.","done":true,"total_duration":
 3821004958,"eval_count":19}
 ```
 
 Look closely at what came back. It's not just a sentence sitting on your screen — it's a proper JSON object, with the actual answer tucked inside a `"response"` field, alongside stuff like how long it took and how many tokens it generated. This is a massive deal, and it's easy to miss why. A chat window gives you text meant for human eyes. This gives you structured data meant for a program to read, pick apart, and pass along to the next step of your pipeline — which is exactly what Chapter 9 is going to need when it wires all five files together.
 
-Now let's actually write the code your pipeline will use, instead of typing `curl` commands by hand. Here's a small Python script that does the exact same thing:
+## From Teaching Script to Permanent Module
+
+Now let's actually write the code your pipeline will use, instead of typing `curl` commands by hand. Here's a small Python script that does the exact same thing. In this chapter it appears as `talk_to_model.py`. In the final pipeline it becomes part of [`code/generate.py`](../code/generate.py):
 
 ```python
-# talk_to_model.py
+# talk_to_model.py (teaching name) → code/generate.py (permanent)
 import requests
 
 def ask_model(prompt, model="llama3.2:3b"):
@@ -67,18 +69,34 @@ if __name__ == "__main__":
     print(answer)
 ```
 
-Run it:
-
 ```bash
 $ python3 talk_to_model.py
 
-The RBI held the repo rate steady at 6.5% for the eighth 
+The RBI held the repo rate steady at 6.5% for the eighth
 consecutive meeting.
 ```
 
 Same answer. Except now, nobody typed anything into a chat window. This is a function — `ask_model()` — that any other piece of code can call, anytime, with any prompt, and get a clean answer back automatically. This one function, sitting quietly in one file, is the actual foundation this entire book is built on top of. Every later chapter — the validator checking claims, the renderer turning text into a graphic, the scheduler running everything at midnight — all of it is going to reach for a function exactly like this one, instead of a human typing into a window.
 
-One quick heads-up before moving on: a few upcoming chapters will show commands like `python3 talk_to_model.py --prompt-file strong_prompt.txt --source pib_release.txt`. That's shorthand for "call `ask_model()` with a prompt built from that file and check it against that source" — it's describing the *behavior*, not a command-line flag this exact script has. Chapter 9 is where `talk_to_model.py` actually gets built out into its permanent, pipeline-ready form (renamed `generate.py`, with a proper `build_prompt()` function alongside `ask_model()`), so don't worry if you try one of those flagged commands here and it doesn't run — that's expected at this stage.
+One quick heads-up before moving on: a few upcoming chapters will show commands like `python3 talk_to_model.py --prompt-file strong_prompt.txt --source pib_release.txt`. That's shorthand for "call `ask_model()` with a prompt built from that file and check it against that source" — it's describing the *behavior*, not a command-line flag this exact script has. Chapter 9 is where `talk_to_model.py` actually gets built out into its permanent, pipeline-ready form (renamed [`generate.py`](../code/generate.py), with a proper `build_prompt()` function alongside `ask_model()`), so don't worry if you try one of those flagged commands here and it doesn't run — that's expected at this stage.
+
+The permanent module also keeps the same API call:
+
+```python
+# generate.py — excerpt; full file: code/generate.py
+import requests
+
+def ask_model(prompt, model="llama3.2:3b", base_url="http://localhost:11434"):
+    response = requests.post(
+        f"{base_url}/api/generate",
+        json={"model": model, "prompt": prompt, "stream": False},
+        timeout=120,
+    )
+    response.raise_for_status()
+    return response.json()["response"]
+```
+
+Chapter 6 will add `build_prompt()` in the same file. Chapter 9's [`run_pipeline.py`](../code/run_pipeline.py) will call both.
 
 ## The Objection: "Can't I Just Copy-Paste From the Chat Window Into My Script?"
 
@@ -88,9 +106,23 @@ Say your plan is: chat window generates the text, you copy it, paste it into a t
 
 There's a second problem too, and it's sneakier. A chat window's output is designed to look nice for a person — sometimes it adds "Sure, here's a summary:" before the actual answer, sometimes it wraps things in extra formatting, sometimes the exact phrasing shifts slightly each time. A human reading it doesn't even notice this stuff. But code trying to automatically grab "just the summary part" out of that text is going to break constantly, because it's never formatted exactly the same way twice. The API call from earlier doesn't have this problem — you get a clean `"response"` field, every single time, in the exact same structure, which your code can rely on without guessing. That reliability is not a nice bonus. It's the actual requirement for anything you plan to automate.
 
+## Where This Fits in the Final Pipeline
+
+| Stage | File | Job |
+|-------|------|-----|
+| Scrape | [`scrape.py`](../code/scrape.py) | Pull real source material |
+| Structure | [`structure.py`](../code/structure.py) | Clean and chunk |
+| **Generate** | [`generate.py`](../code/generate.py) | **Prompt + model call (`ask_model`)** |
+| Validate | [`validator.py`](../code/validator.py), [`validate_response.py`](../code/validate_response.py) | Reject ungrounded claims |
+| Render | [`render_card.py`](../code/render_card.py) | Turn approved text into a card |
+
+Right now you only have the model-call half. Chapter 6 fills in the grounded prompt; Chapter 9 wires it into [`run_pipeline.py`](../code/run_pipeline.py).
+
 ## Chapter Summary
 
 A chat window is genuinely great for testing whether a model fits your task — that's exactly what it was used for in Chapter 2. But it needs a human present for every single step, which makes it a demo tool, not something a pipeline can be built on. Underneath that chat window, Ollama runs a real API that you can call directly with `curl` or with plain code, and it hands back structured, predictable JSON instead of loose text meant for a person's eyes. Wrapping that call inside one small function — like `ask_model()` — gives you the actual foundation this whole book sits on: a way to ask your model anything, automatically, with no one typing, and get back an answer your code can reliably use.
+
+Permanent home for this logic: [`code/generate.py`](../code/generate.py) (`ask_model`; later also `build_prompt`).
 
 ## Bridge to Chapter 4
 

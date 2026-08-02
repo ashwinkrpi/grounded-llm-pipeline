@@ -13,7 +13,7 @@ Okay so here's a scene that happens to literally everyone starting out. You go o
 ```bash
 $ ollama run llama3.1:70b
 
-pulling manifest 
+pulling manifest
 Error: model requires more system memory (44.0 GiB) than is available (7.6 GiB)
 ```
 
@@ -53,7 +53,6 @@ $ curl -fsSL https://ollama.com/install.sh | sh
 >>> Adding current user to ollama group...
 >>> Creating ollama systemd service...
 >>> Enabling and starting ollama service...
->>> NVIDIA GPU installed.
 >>> The Ollama API is now available at 127.0.0.1:11434.
 ```
 
@@ -62,7 +61,7 @@ Now pull a model that's actually sized for a Pi:
 ```bash
 $ ollama pull llama3.2:3b
 
-pulling manifest 
+pulling manifest
 pulling dde5aa3fc5ff... 100% ▕████████████████▏ 2.0 GB
 pulling 966de95ca8a6... 100% ▕████████████████▏ 1.4 KB
 pulling fcc5a6bec9da... 100% ▕████████████████▏ 7.7 KB
@@ -80,15 +79,37 @@ Now the second question — task fit. Run the model and give it something close 
 $ ollama run llama3.2:3b
 
 >>> Summarize this in one factual sentence, no extra commentary:
->>> "The Reserve Bank of India kept the repo rate unchanged at 6.5% 
->>> for the eighth consecutive time in its latest monetary policy 
+>>> "The Reserve Bank of India kept the repo rate unchanged at 6.5%
+>>> for the eighth consecutive time in its latest monetary policy
 >>> meeting, citing ongoing inflation concerns."
 
-The RBI held the repo rate at 6.5% for the eighth straight meeting 
+The RBI held the repo rate at 6.5% for the eighth straight meeting
 due to inflation concerns.
 ```
 
 Notice what you're actually checking here — not "is this smart," but "does this behave the way I need it to." Did it follow the instruction (one sentence, factual, no extra fluff)? Did it stay close to the source instead of wandering off and adding its own opinions? That's the real test. A model that writes beautiful, long, creative paragraphs might genuinely be a bad fit for this book's pipeline, where you specifically want short, tight, source-anchored output. A model that sounds a bit robotic and dry might actually be perfect for this exact use case. "Good" and "right for the job" are two completely different things, and this book only cares about the second one.
+
+## Where the Model Name Shows Up in Code
+
+You pick the model once here. The rest of the pipeline refers to it by name when it talks to Ollama.
+
+In Chapter 3 you'll wrap the API call in `ask_model()`. In the permanent pipeline that lives in [`code/generate.py`](../code/generate.py):
+
+```python
+# generate.py — excerpt; full file: code/generate.py
+def ask_model(prompt, model="llama3.2:3b", base_url="http://localhost:11434"):
+    response = requests.post(
+        f"{base_url}/api/generate",
+        json={"model": model, "prompt": prompt, "stream": False},
+        timeout=120,
+    )
+    response.raise_for_status()
+    return response.json()["response"]
+```
+
+[`run_pipeline.py`](../code/run_pipeline.py) can pass a different `model=` if you ever switch. Default stays whatever you validated in this chapter — typically `llama3.2:3b` on an 8 GB Pi.
+
+You do not need a separate model-selection module. Hardware fit is a decision you make once; the code just uses the name you chose.
 
 ## The Objection: "Can't I Just Use the Biggest Model My Pi Can Barely Handle?"
 
@@ -97,15 +118,15 @@ Totally fair thing to think — "bigger is smarter, so let me just squeeze in th
 ```bash
 $ ollama pull llama3.1:8b
 
-pulling manifest 
+pulling manifest
 pulling 8eeb52dfb3bb... 100% ▕████████████████▏ 4.7 GB
 success
 
-$ time ollama run llama3.1:8b "Summarize this in one sentence: 
+$ time ollama run llama3.1:8b "Summarize this in one sentence:
 The Reserve Bank of India kept the repo rate unchanged at 6.5%."
 
-The RBI kept the repo rate steady at 6.5%, its latest monetary 
-policy decision, reflecting continued caution amid inflationary 
+The RBI kept the repo rate steady at 6.5%, its latest monetary
+policy decision, reflecting continued caution amid inflationary
 pressures and a measured approach to economic stability.
 
 real    0m47.312s
@@ -115,9 +136,23 @@ Compare that to the 3b model from earlier, which gave a similarly correct answer
 
 The honest answer is: pick the smallest model that still does your specific task well. Not the smallest one period, and not the biggest one that technically loads — the smallest one that still gives you output you're happy with, for the exact narrow job you're asking it to do. For a pipeline built around short, factual, source-anchored writing, that's very often a 3b model, not an 8b one. Save the bigger stuff for when you genuinely need heavier reasoning, and even then — think hard before running it on a Pi at all.
 
+## Where This Fits in the Final Pipeline
+
+| Stage | File | Job |
+|-------|------|-----|
+| Scrape | [`scrape.py`](../code/scrape.py) | Pull real source material |
+| Structure | [`structure.py`](../code/structure.py) | Clean and chunk |
+| Generate | [`generate.py`](../code/generate.py) | Grounded prompt + **model call** (name chosen here) |
+| Validate | [`validator.py`](../code/validator.py), [`validate_response.py`](../code/validate_response.py) | Reject ungrounded claims |
+| Render | [`render_card.py`](../code/render_card.py) | Turn approved text into a card |
+
+This chapter has no permanent stage file of its own. It decides the default `model=` string that [`generate.py`](../code/generate.py) and [`run_pipeline.py`](../code/run_pipeline.py) will use for the rest of the book.
+
 ## Chapter Summary
 
 Picking a local model isn't about chasing whatever's trending — it's a two-part decision that actually determines whether your pipeline runs at all. First, check your hardware honestly with something like `free -h`, and match the model's size to what you actually have available, because no clever prompt fixes a model that literally can't fit in RAM. Second, test the model against the actual task you need it to do — short, factual, structured output, in this book's case — instead of judging it on how impressive or creative it sounds in general. And bigger isn't automatically better: a model that barely fits when it's running alone is going to cause real problems once it becomes one part of a bigger automated system.
+
+Default used in the permanent code: `llama3.2:3b` (change the `model=` argument in [`generate.py`](../code/generate.py) / [`run_pipeline.py`](../code/run_pipeline.py) if your hardware or task needs something else).
 
 ## Bridge to Chapter 3
 
