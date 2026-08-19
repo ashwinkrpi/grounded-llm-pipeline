@@ -1,6 +1,8 @@
 # check_last_run.py
 """Inspect the most recent pipeline run in the log file and report its health."""
 
+from __future__ import annotations
+
 from pathlib import Path
 
 # Default location used by Chapter 10 / cron setup.
@@ -23,8 +25,10 @@ def check_last_run() -> str:
     """
     Return a short human-readable status of the most recent run.
 
-    Looks for stage lines containing SUCCESS / FAILED / REJECTED / APPROVED.
-    Compatible with both plain print-style logs and structured logging output.
+    Looks for stage lines containing SUCCESS / FAILED / REJECTED / APPROVED
+    and for the structured "=== run start ===" markers emitted by the
+    logging setup in run_pipeline.py.
+    Compatible with both plain print-style logs and timestamped logging output.
     """
     lines = _read_log()
 
@@ -39,13 +43,13 @@ def check_last_run() -> str:
 
     recent = lines[start_idx:]
 
-    # Keep only lines that look like stage outcomes
+    # Keep only lines that look like stage outcomes or errors
     stage_lines = [
         line
         for line in recent
         if any(
             token in line.upper()
-            for token in ("STAGE", "SUCCESS", "FAILED", "REJECTED", "APPROVED", "ERROR")
+            for token in ("STAGE", "SUCCESS", "FAILED", "REJECTED", "APPROVED", "ERROR", "CRITICAL")
         )
     ]
 

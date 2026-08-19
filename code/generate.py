@@ -1,20 +1,31 @@
 # generate.py
 """Stage 3: Build a grounded prompt and call the local model."""
 
+from __future__ import annotations
+
+import os
+
 import requests
 
 
 def ask_model(
     prompt: str,
-    model: str = "llama3.2:3b",
-    base_url: str = "http://localhost:11434",
+    model: str | None = None,
+    base_url: str | None = None,
 ) -> str:
     """
     Send a prompt to the Ollama /api/generate endpoint.
     Returns the model's response text.
+
+    Defaults can be overridden by environment variables:
+      GROUNDED_MODEL
+      GROUNDED_BASE_URL
     """
+    model = model or os.environ.get("GROUNDED_MODEL", "llama3.2:3b")
+    base_url = base_url or os.environ.get("GROUNDED_BASE_URL", "http://localhost:11434")
+
     response = requests.post(
-        f"{base_url}/api/generate",
+        f"{base_url.rstrip('/')}/api/generate",
         json={"model": model, "prompt": prompt, "stream": False},
         timeout=120,
     )
@@ -27,7 +38,7 @@ def build_prompt(source_chunk: str, question: str | None = None) -> str:
     Assemble the strict grounding prompt from Chapter 6.
 
     The model must quote exact source phrases in brackets or reply
-    with the fixed fallback sentence.
+    with the fixed fallback sentence "Not stated in source."
     """
     if question is None:
         question = "Summarize the key fact in this source."
