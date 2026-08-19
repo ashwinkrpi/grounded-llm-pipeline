@@ -100,11 +100,15 @@ There it is, in black and white. Same bracketed phrase, two different outcomes, 
 The stage-level function that decides what's allowed to survive lives in [`code/validate_response.py`](../code/validate_response.py). It pulls every `[bracketed]` citation out of the model answer and runs each one through `validate_citation`:
 
 ```python
-# validate_response.py — full file: code/validate_response.py
+# validate_response.py — excerpt; full file: code/validate_response.py
 import re
 from validator import validate_citation
 
 def validate_response(answer, source_text, threshold=0.85):
+    # Allowed fallback from the Chapter 6 prompt — honest refusal, not a hallucination
+    if answer.strip().lower().rstrip(".") == "not stated in source":
+        return {"status": "approved", "citations": [], "reason": "not stated in source"}
+
     citations = re.findall(r"\[(.*?)\]", answer)
     if not citations:
         return {"status": "rejected", "reason": "no citations found", "citations": []}
@@ -116,9 +120,10 @@ def validate_response(answer, source_text, threshold=0.85):
 
     if all(r["valid"] for r in results):
         return {"status": "approved", "citations": results}
-    else:
-        return {"status": "rejected", "citations": results}
+    return {"status": "rejected", "citations": results}
 ```
+
+**What changed for the permanent version:** the live module treats the exact fallback sentence `Not stated in source.` as approved (a correct refusal). Teaching demos that only show the citation path are still valid; the permanent file is the full behavior.
 
 ```bash
 $ python3 -c "
@@ -147,6 +152,17 @@ By the end of Chapter 9, validation is Stage 4 of five:
 | Render | [`render_card.py`](../code/render_card.py) | Turn approved text into a card |
 
 The orchestrator [`run_pipeline.py`](../code/run_pipeline.py) only proceeds to render when `validate_response` returns `"approved"`. Anything else stops the run with a clear `[STAGE: validate] REJECTED` line.
+
+## How to Unit-Test the Validator
+
+Mechanical trust only holds if the matcher keeps working when you change thresholds or source text. A small fixture suite lives in [`code/tests/test_validator.py`](../code/tests/test_validator.py):
+
+```bash
+cd code
+python3 tests/test_validator.py
+```
+
+You should see every case `PASS`: exact match, wrong citation, near-match, full response approve/reject, and the `Not stated in source.` fallback. Re-run these tests whenever you touch `validator.py` or the threshold. That is the same spirit as the pipeline itself — do not trust the checker on vibes; prove it against fixed examples.
 
 ## The Objection: "Isn't a Strict Word-Match Validator Going to Reject Perfectly Good Paraphrases?"
 

@@ -97,6 +97,8 @@ By the end of Chapter 9, this module is one of the five permanent stages:
 
 The orchestrator [`run_pipeline.py`](../code/run_pipeline.py) only calls `render_card()` after validation has returned `"approved"`. Failed or rejected runs never reach this stage — which is exactly what you want. You never render a sentence you don't trust.
 
+Sample cards from this layout (approved wording only) live under [`images/examples/`](../images/examples/). Rejected runs produce no image by design — the absence of a card *is* the visual signal that validation stopped the pipeline.
+
 ## The Objection: "Why Not Just Post the Text Directly — Isn't an Image Just Extra Work?"
 
 Fair pushback, especially if you're thinking about places where plain text posts perfectly well — a tweet, a forum reply, a Slack message. Why add a whole rendering step, fonts, image generation, all of it, when you could just post the sentence as-is?

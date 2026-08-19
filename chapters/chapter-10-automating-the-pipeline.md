@@ -126,9 +126,41 @@ There's a more honest way to frame this decision, actually: the right tool for a
 
 ## Optional: Structured Logging Instead of Bare Redirect
 
-The `>> run.log 2>&1` approach is enough for this book. If you later want timestamps, levels, and rotation on a Pi that runs for months, you can add a small logging setup and keep the same stage messages. The important part stays the same: failures must still surface as clear `FAILED` / `REJECTED` lines so [`check_last_run.py`](../code/check_last_run.py) can find them.
+The `>> run.log 2>&1` approach is enough for this book. The permanent [`run_pipeline.py`](../code/run_pipeline.py) already emits timestamped stage lines when you run it directly. Failures must still surface as clear `FAILED` / `REJECTED` lines so [`check_last_run.py`](../code/check_last_run.py) can find them.
 
-Until you need that, stick with the simple redirect. Boring is a feature here.
+## When the Pipeline Keeps Rejecting
+
+Scheduling is not enough if every morning ends in `[STAGE: validate] REJECTED` and nobody acts. Treat repeated failures as a product problem, not only a log line.
+
+**1. Alert on failure.**  
+Have the health-check cron job email you, push a notification, or write to a file you actually open:
+
+```bash
+# Example: only notify when the last run was bad
+5 7 * * * /usr/bin/python3 /home/pi/grounded-pipeline/code/check_last_run.py \
+  | grep -q "HAD ISSUES" && echo "Grounded pipeline failed" | mail -s "Grounded alert" you@example.com
+```
+
+Replace `mail` with whatever you already use (ntfy, a Telegram bot, a Slack webhook). The important part is a human sees the failure without opening the log by habit.
+
+**2. Fallback source.**  
+If the primary URL is down or the layout changed, keep a second trusted URL and try it when scrape fails. A minimal pattern:
+
+```python
+# sketch for your own wrapper around run_pipeline
+for url in (primary_url, fallback_url):
+    outcome = run_pipeline(url=url, source_name=source_name, ...)
+    if outcome.get("status") in ("success", "approved_no_render"):
+        break
+```
+
+Do not fall back to a random aggregator — that would undo Chapter 4’s discipline.
+
+**3. Human review queue.**  
+When validation rejects, save the model answer and source chunk to a `review/` folder instead of deleting them. Once a week, skim the queue. Patterns you will see: the question is too broad for the page, the chunk selection missed the paragraph, or the model paraphrased too aggressively for the threshold. Fix the question, the sources, or the threshold — do not disable the validator.
+
+**4. Count consecutive failures.**  
+A single reject can be noise. Three mornings in a row means stop publishing and fix the root cause before the cron job resumes.
 
 ## Chapter Summary
 

@@ -6,60 +6,77 @@ Code samples in this chapter are licensed separately under MIT — see /LICENSE.
 
 # Chapter 1: The Hallucination Problem
 
-## The Model That Lies With Full Confidence
+## The Model That Invents When It Has Nothing Real to Stand On
 
-Let's do a small experiment first, no cap. Open your local model — doesn't matter which one, Ollama, whatever, they all do this same thing — and ask it something specific. Something you can actually check. Not some big fancy question like "explain quantum computing." A small, factual question.
-
-```bash
-$ ollama run llama3.1
-
->>> What was the closing price of Nvidia stock on March 14, 2024,
->>> and who was the CEO who announced their Q4 earnings that quarter?
-
-Nvidia's stock closed at $926.69 on March 14, 2024. CEO Jensen Huang
-announced record Q4 earnings that quarter, citing strong demand for
-the H100 GPU driven by AI infrastructure spending.
-```
-
-Bro, look at that answer. Sounds so correct, right? There's a proper dollar number, a real CEO name, a real product name. It's giving "confident finance analyst" energy.
-
-Problem is — it's wrong. Not "thoda different" wrong. The actual number that day was not this. And the model didn't take this number from anywhere real. It just generated something that *looks like* a stock price, in the format a stock price usually comes in, next to a real company and a real CEO name. That's the whole trap here. This is not some broken, jumbled-up sentence you can catch easily. It's a fully correct-looking, fully confident, 100% made-up fact — said in the exact same tone as everything else the model gets right.
-
-This is called a **hallucination**. And if you're building something that will actually get posted, shared, or read by real people — this one issue is literally the whole game. Every single chapter after this one exists only to fix this problem.
-
-## Why You Can't Just "Prompt Your Way" Out of This
-
-First reaction everyone has — "oh it's just a prompting issue na, I'll just tell it to be careful." Add a line like "only say facts you're 100% sure about." Add "if you don't know, just say you don't know."
-
-Let's try:
+Open your local model and ask it to produce a short factual post about something specific — the same kind of task a content pipeline will ask it to do every day.
 
 ```bash
->>> Only answer with verified facts. If you are not certain, say
->>> "I don't know." What was Nvidia's closing stock price on
->>> March 14, 2024?
+$ ollama run llama3.2:latest
 
-Nvidia's stock closed at approximately $926.69 on March 14, 2024.
+>>> Write a two-sentence factual update for a finance audience about how the
+>>> Reserve Bank of India's real-time gross settlement system reduced interbank
+>>> settlement risk. Include one specific percentage and one year.
+
+The Reserve Bank of India's full rollout of real-time gross settlement in 2013
+cut overnight interbank settlement exposure by 47%, according to operational
+data released with the system upgrade. Continuous settlement replaced the older
+deferred net settlement window and removed the bulk of the risk that previously
+accumulated between clearing cycles.
 ```
 
-Same wrong number. Just now it has "approximately" stuck in front, which honestly makes it sound *more* trustworthy — like the model is being careful about a real fact it's half-remembering, instead of just inventing one out of nowhere.
+Two clean sentences. A precise year. A precise percentage. Institutional tone. Most readers would accept it.
 
-Here's what's actually happening, and it's worth understanding this properly instead of just accepting it: an LLM does not have a database where it looks up facts. It has a very strong sense — built from tons and tons of text — of what word usually comes after the last one. So when you ask it for Nvidia's stock price on a specific date, it's not pulling up a record. It's completing a pattern. "Nvidia's stock closed at $" is very likely followed by a number that *looks* like a real Nvidia price, in the range Nvidia usually trades in. The model has zero internal system to tell the difference between "I actually remember this" and "I'm generating something that fits this pattern." Both come out sounding exactly the same, because inside the model, it's literally the same process. There's no fact-checker sitting behind the scenes vetoing bad answers. The smooth talking and the made-up facts come from the exact same place.
+Both numbers are invented. The model was not given any source text. It completed a plausible pattern: central bank + RTGS + round percentage + year that sounds right. That is a **hallucination** — a fluent, confident statement that is not grounded in anything real.
 
-This is exactly why prompting alone can't solve this. You can't tell a system to separate "remembered" facts from "generated" facts when it never made that separation in the first place. Telling a hallucinating model to "be more careful" is like telling someone who's really good at improv to only improvise when they don't actually know the answer — but the whole issue is, the improv doesn't feel like improv to them. It feels the same as knowing.
+You may get a different invention, or a partial refusal, depending on the exact model build and temperature. That variance is normal. The underlying problem is the same: when the model has no source material, it still produces text that *looks* like sourced fact. A pipeline that publishes that text is publishing invention.
 
-## Why This Matters Even More When You're Publishing Stuff
+## Why "Just Ask Carefully" Is Not Enough
 
-If you're just chatting with the model for yourself, casually, a hallucination is a small annoyance. You spot it, double check that one number, and move on. No big deal.
+Newer small models refuse more often than older ones, especially on pure lookup questions ("What is the exact title and DOI of the 2023 paper…"). Try one and you may see:
 
-But this book isn't about chatting. It's about building a **pipeline** — something that scrapes real content, generates stuff from it automatically, and produces a finished thing — a post, a card, a summary image — without you personally checking every single output before it goes live.
+```bash
+>>> What is the exact title, authors, and DOI of the 2023 paper that measured
+>>> a 47% reduction in interbank settlement risk after RBI RTGS rollout?
 
-The second you automate that loop, hallucination stops being a small annoyance and becomes the biggest risk in your whole system. A pipeline that occasionally makes up a stat, wrongly quotes someone, or states a date that never even happened — that's not a content pipeline anymore. That's a machine that's manufacturing convincing-looking misinformation, on whatever schedule you set it to run. The whole point of automation is speed and not needing to babysit it — but those exact two things are what turn one small hallucination into a real problem. One wrong number in a private chat, nobody cares. One wrong number in something that got auto-posted publicly, with your name on it — that's an embarrassing correction, or worse, something nobody even catches.
+I couldn't find any information on a specific paper by Sharma, Patel, and
+Kumar that measures a 47% reduction...
+```
 
-So the bar for this pipeline can't just be "the model tries its best to be accurate." It has to be built into the structure itself: **nothing the model generates makes it to the final output unless it can be matched back to a real source you actually collected.** Not "the model was told to be careful." Not "the model sounded confident." Actually matched, mechanically, to real text you scraped. This isn't a prompt trick — it's a design decision. That's exactly why this pipeline has a scraping stage, a cleaning stage, and — this is the important one — a full chapter (Chapter 7) dedicated purely to a validator whose only job is checking every single claim against the source and throwing it out if it doesn't match.
+A refusal looks like progress. It is incomplete protection. The same model, asked to *write* rather than *retrieve*, will still invent percentages, years, and official-sounding names. In the earlier RTGS example it may refuse the paper and, in the next breath, invent a wrong system acronym or a launch year. The refusal covers the question you asked carefully. It does not cover the generation task a pipeline actually runs.
+
+Stronger instructions do not close the gap either:
+
+```bash
+>>> Only use verified facts. If you are not certain, say "I don't know."
+>>> Write a two-sentence update on RBI RTGS risk reduction with a specific
+>>> percentage.
+
+I don't have a verified percentage for risk reduction after RTGS adoption.
+Operational reviews often cite substantial declines in overnight exposure;
+one figure that appears in secondary summaries is around 47%.
+```
+
+It hedged, then still offered the invented number under softer language. The caution makes the false detail easier to trust, not harder.
+
+An LLM does not query a database of facts. It predicts the next token from patterns in training data. "Cut exposure by __%" is a shape it has seen many times. The model has no internal mark that separates "I recall this figure" from "I am generating a figure that fits the shape." Both sound the same, because inside the model they are the same process.
+
+## Why This Becomes Dangerous the Moment You Automate
+
+In a private chat a hallucination is a minor annoyance. You notice the odd percentage, check it, move on.
+
+This book is not about chatting. It is about building a **pipeline** that scrapes real sources, generates text, and produces a finished artifact — a post, a card, an image — without a human reviewing every output before it goes live.
+
+Once that loop is automated, hallucination stops being an annoyance and becomes the central risk. A system that occasionally invents a percentage, a year, or an official name is no longer a content tool. It is a machine that can publish convincing misinformation on a schedule. The two main benefits of automation — speed and the absence of constant human supervision — are exactly what turn a small invention into a public error with your name on it.
+
+So the bar cannot be "the model tries hard" or "the model refused the hard question." It has to be structural:
+
+**Nothing the model generates is allowed into the final output unless it can be matched back to a real source you collected.**
+
+Not "the model was told to be careful." Not "the model sounded confident." Actually matched, by code, to text you scraped. That is a design decision. It is why this pipeline has a scrape stage, a cleaning stage, and — the critical piece — a full chapter (Chapter 7) whose only job is a validator that checks every claim against the source and rejects anything that does not match.
 
 ## How the Rest of the Book Fixes This
 
-There is no permanent code file in this chapter — the problem is conceptual. The fix is the five-stage pipeline you will assemble by Chapter 9:
+There is no permanent code file in this chapter. The problem is conceptual. The fix is the five-stage pipeline assembled by Chapter 9:
 
 | Stage | File | How it fights hallucination |
 |-------|------|-----------------------------|
@@ -69,24 +86,31 @@ There is no permanent code file in this chapter — the problem is conceptual. T
 | Validate | [`validator.py`](../code/validator.py), [`validate_response.py`](../code/validate_response.py) | Mechanical check: does this quote exist in the source? |
 | Render | [`render_card.py`](../code/render_card.py) | Only approved text becomes a finished artifact |
 
-Wired together by [`run_pipeline.py`](../code/run_pipeline.py), scheduled and watched in Chapter 10 ([`check_last_run.py`](../code/check_last_run.py)), and reused for any niche in Chapter 11.
+Wired together by [`run_pipeline.py`](../code/run_pipeline.py), scheduled and monitored in Chapter 10 ([`check_last_run.py`](../code/check_last_run.py)), and reused for any niche in Chapter 11.
 
 The model's job is never to be trusted on its own. The structure is what makes the output trustworthy.
 
 ## The Obvious Question: "Won't a Bigger, Better Model Just Fix This?"
 
-Fair question, and worth actually answering properly, because a lot of people assume yes and get burned later.
+Bigger models hallucinate less often, especially on common facts. A frontier model is less likely to invent a wrong president or a completely fake formula than a 3B model on a Raspberry Pi. "Less often" is not "never." Even the largest models still lack a reliable internal signal that marks which tokens are recalled and which are smoothly invented. Scale changes frequency. It does not change the mechanism. When a large model invents a statistic or a citation, the tone is still fully confident.
 
-Honest answer: bigger models hallucinate *less*, especially for common, well-known facts. A big frontier-level model is less likely to randomly invent a wrong president or a wrong formula than a small model running on your Raspberry Pi. But "less often" is not the same as "never" — and there's a real reason bigger size doesn't fix the actual problem: even the biggest model still has no built-in way to tell you which part of its answer it's actually sure about, versus which part it's just smoothly filling in. Bigger size lowers how often it happens. It does not change *how* it happens. Even the top commercial models out there — way bigger than anything you'll run at home — still get dates wrong, misquote sources, and even make up fake research papers that don't exist. Less often, yes. Still happens, and when it does, it sounds just as confident as ever.
+You are also not free to pick the least-hallucinating model available. You are picking one that fits your hardware (Chapter 2). That usually means a smaller model and higher invention risk. If "just use a better model" were enough, this book would end here and would not run on a Pi. It does not end here, because the real fix is design: collect real source material, force the model to work only from that material, then check every claim mechanically before anything is published. A small model behind a proper validator beats a large model with none.
 
-There's a second reason this matters specifically for you: you're not picking a model based on which one hallucinates least overall. You're picking one that actually fits your hardware — that's the whole topic of Chapter 2 — which usually means going smaller, which actually means *more* hallucination, not less. If "just use a good model" was really the fix, this book would be over right here, and it definitely wouldn't work on a Raspberry Pi. It's not over, because the real fix isn't model quality — it's the design. Get real source material first, force the model to only generate based on that material, then independently double-check every single claim before anything gets published. A small model with a proper validation step beats a huge model with none, because the validation step is what actually catches the lie. In this pipeline, the model's job is never to be trusted on its own.
+## What You Should See When You Try the Demo
+
+Model builds differ. On some machines the first prompt invents a clean percentage and year. On others you get a refusal or a hedge. Both outcomes are useful:
+
+- If it invents — you just watched the failure mode the pipeline is built to stop.
+- If it refuses — notice that the same model will still invent when the task is ordinary generation without source text, or will invent adjacent details after a partial refusal. The lookup refusal does not protect a write-heavy pipeline.
+
+Either way, the lesson is the same: do not trust the model's words unless those words can be traced to a source you control.
 
 ## Chapter Summary
 
-An LLM without proper grounding isn't just unreliable sometimes — it genuinely can't tell you when it's making something up, because generating something believable and remembering something true happen through the exact same process inside it. Telling it to "be careful" doesn't fix that, because there's no internal signal separating confident guessing from confident recall. This becomes a real danger specifically when you automate things — when content goes out without you checking every piece — which is literally what this book is teaching you to build. And no, a bigger, better model doesn't solve this either; the real fix is to stop trusting the model as the source of truth at all, and instead build a pipeline where every single claim has to survive being checked against a real source before it ever reaches your final output.
+An LLM without grounding cannot reliably tell you when it is inventing, because generation and recall are the same process. Newer models refuse more lookup questions, yet they still invent fluent details when asked to write, and they invent adjacent facts even after a refusal. Prompting does not close the gap. Scale reduces frequency but does not remove the mechanism. The danger becomes concrete the moment output is automated and published without a human check on every piece. The solution is not a smarter model. It is a pipeline in which every claim must survive a mechanical match against a real source before it reaches the final artifact.
 
-That's basically the whole book, said as a problem instead of a solution: get real material, make the model generate only from it, then check mechanically that it actually did. Every chapter from here is one piece of building that system. The assembled code lives in [`code/`](../code/).
+That is the whole book stated as a problem: get real material, make the model generate only from it, then check mechanically that it actually did. Every following chapter builds one piece of that system. The assembled code lives in [`code/`](../code/).
 
 ## Bridge to Chapter 2
 
-But before you can build any of this grounding and checking system, you need something to actually run it on. And picking your model isn't some small one-time decision you forget about — it decides what actually fits in your Pi's memory, how fast (or slow) each answer comes out, whether your output sounds short and fact-heavy or long and essay-like, and even how easy the model is to control later, once Chapter 7's validator starts checking its work properly. Chapter 2 is about making this choice the right way — not by asking "which model is trending right now," but by asking the two questions that actually matter: what your hardware can actually handle, and what you need your output to sound like.
+Before you can build the grounding and checking system, you need something to run it on. Model choice is not a one-time detail. It determines what fits in your Pi's memory, how fast answers arrive, whether the output stays short and factual or turns into essays, and how controllable the model is once Chapter 7's validator starts rejecting its work. Chapter 2 is about making that choice correctly: not by chasing whatever is trending, but by asking what your hardware can actually run and what your output needs to sound like.

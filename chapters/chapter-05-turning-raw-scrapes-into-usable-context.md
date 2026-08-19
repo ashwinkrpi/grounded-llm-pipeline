@@ -120,7 +120,7 @@ Reasonable thought — local models are getting context windows big enough to sw
 Let's actually test that logic:
 
 ```bash
-$ python3 talk_to_model.py --input raw_rbi_page.html --model llama3.2:3b
+$ python3 talk_to_model.py --input raw_rbi_page.html --model llama3.2:latest
 
 Summary: The website discusses cookie policies and provides
 navigation options including Home, About Us, Press Releases, and

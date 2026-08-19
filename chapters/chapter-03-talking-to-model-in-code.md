@@ -8,13 +8,13 @@ Code samples in this chapter are licensed separately under MIT — see /LICENSE.
 
 ## The Pipeline That Broke Because a Human Wasn't Home
 
-Picture this. You've built a nice little setup — every morning at 7 AM, you sit down, open the Ollama chat window, type in your prompt, copy the answer, paste it into a doc, and post it. Works perfectly for two weeks straight. You're feeling good, telling your friends "bro I built an automated content thing." Then one Tuesday you sleep through your alarm. Nothing gets posted. Wednesday you're stuck in a family function the whole morning. Nothing gets posted again. By Friday you realize — this was never actually automated. It was just you, doing a repetitive task, with a chatbot as your typing assistant. The second you weren't available, the whole thing stopped existing.
+Picture this. Every morning at 7 AM you open the Ollama chat window, type a prompt, copy the answer, paste it into a doc, and post it. It works for two weeks. You start calling it an automated content system. Then one Tuesday you sleep through the alarm — nothing posts. Wednesday you are busy all morning — nothing posts again. By Friday it is obvious: this was never automated. It was you, doing a repetitive task, with a chatbot as a typing assistant. The moment you were unavailable, the whole thing stopped.
 
-That's the exact trap this chapter is here to pull you out of. A chat window feels like a pipeline because it's fast and it works. But "works when I'm sitting here typing" and "works automatically, every single day, without me" are two completely different systems. And the difference between them isn't a small tweak — it's a whole different way of talking to your model.
+That is the trap this chapter is here to pull you out of. A chat window feels like a pipeline because it is fast and it works. But "works when I am sitting here typing" and "works every day without me" are different systems. The gap is not a small tweak — it is a different way of talking to the model.
 
 ## Why Chat Was Never Built for This
 
-Let's be precise about what a chat window actually is. When you type into `ollama run llama3.2:3b` and hit enter, you are a human, manually starting a program, manually typing input, manually reading output, and manually deciding what to do with that output next. Every single one of those four steps needs you. That's fine for testing — that's literally what you did in Chapter 2 to check if a model fit your task. But a pipeline, by definition, needs to run those same four steps with zero humans involved. Something else needs to start the request, send the input, receive the output, and hand it to the next step — automatically, on a schedule, at 3 AM if needed, while you're asleep.
+Let's be precise about what a chat window actually is. When you type into `ollama run llama3.2:latest` and hit enter, you are a human, manually starting a program, manually typing input, manually reading output, and manually deciding what to do with that output next. Every single one of those four steps needs you. That's fine for testing — that's literally what you did in Chapter 2 to check if a model fit your task. But a pipeline, by definition, needs to run those same four steps with zero humans involved. Something else needs to start the request, send the input, receive the output, and hand it to the next step — automatically, on a schedule, at 3 AM if needed, while you're asleep.
 
 The good news is, Ollama isn't only a chat window. Underneath that `ollama run` command, there's a proper API quietly running on your machine, and you can talk to it directly with plain code instead of a keyboard. Let's prove this actually works, step by step.
 
@@ -23,7 +23,7 @@ First, check the API is alive:
 ```bash
 $ curl http://localhost:11434/api/tags
 
-{"models":[{"name":"llama3.2:3b","model":"llama3.2:3b","modified_at":
+{"models":[{"name":"llama3.2:latest","model":"llama3.2:latest","modified_at":
 "2026-06-02T09:14:22Z","size":2019393792,...}]}
 ```
 
@@ -31,13 +31,13 @@ That's your model, sitting there, ready to be talked to — not through a chat w
 
 ```bash
 $ curl http://localhost:11434/api/generate -d '{
-  "model": "llama3.2:3b",
+  "model": "llama3.2:latest",
   "prompt": "Summarize in one sentence: The RBI kept the repo rate
   unchanged at 6.5% for the eighth straight meeting.",
   "stream": false
 }'
 
-{"model":"llama3.2:3b","created_at":"2026-07-09T04:12:08Z",
+{"model":"llama3.2:latest","created_at":"2026-07-09T04:12:08Z",
 "response":"The RBI held the repo rate steady at 6.5% for the
 eighth consecutive meeting.","done":true,"total_duration":
 3821004958,"eval_count":19}
@@ -53,7 +53,7 @@ Now let's actually write the code your pipeline will use, instead of typing `cur
 # talk_to_model.py (teaching name) → code/generate.py (permanent)
 import requests
 
-def ask_model(prompt, model="llama3.2:3b"):
+def ask_model(prompt, model="llama3.2:latest"):
     response = requests.post(
         "http://localhost:11434/api/generate",
         json={"model": model, "prompt": prompt, "stream": False}
@@ -86,7 +86,7 @@ The permanent module also keeps the same API call:
 # generate.py — excerpt; full file: code/generate.py
 import requests
 
-def ask_model(prompt, model="llama3.2:3b", base_url="http://localhost:11434"):
+def ask_model(prompt, model="llama3.2:latest", base_url="http://localhost:11434"):
     response = requests.post(
         f"{base_url}/api/generate",
         json={"model": model, "prompt": prompt, "stream": False},
@@ -126,4 +126,4 @@ Permanent home for this logic: [`code/generate.py`](../code/generate.py) (`ask_m
 
 ## Bridge to Chapter 4
 
-Right now, though, that `ask_model()` function only has one thing to work with — whatever question you type into the `prompt` argument yourself. And that's a problem, because a pipeline that only knows what you personally typed into it isn't grounded in anything real — it's just back to the exact hallucination risk Chapter 1 warned you about, except now it's automated instead of manual, which honestly makes it worse. Before this function is useful for anything real, it needs real material to work with — actual headlines, actual numbers, actual text pulled from actual sources on the internet, not just whatever you happened to type. Getting that real material safely and reliably onto your machine is the whole job of the next chapter.
+Right now that `ask_model()` function only has one input: whatever question you put in the `prompt` argument. A pipeline that only knows what you typed is not grounded in anything real — it is the same hallucination risk from Chapter 1, only automated, which makes it worse. Before the function is useful, it needs real material: headlines, numbers, and text pulled from actual sources. Getting that material onto your machine safely is the job of the next chapter.

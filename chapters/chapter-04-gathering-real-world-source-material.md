@@ -8,7 +8,7 @@ Code samples in this chapter are licensed separately under MIT — see /LICENSE.
 
 ## The Guy Who Scraped 4,000 Pages and Got Worse Results Than the Guy Who Scraped 5
 
-There's a story that goes around in scraping communities, and honestly it's basically the same story every single time, just with different names. Someone builds a scraper, points it at a huge news aggregator site, tells it "grab everything," and lets it run overnight. By morning they've got 4,000 articles sitting in a folder — proper flex, right? Feels like progress. Meanwhile, someone else spends thirty minutes picking five actually solid sources for their exact topic, writes a scraper that only touches those five, and stops there.
+There's a story that goes around in scraping communities, and it is basically the same story every time. Someone builds a scraper, points it at a huge news aggregator, tells it "grab everything," and lets it run overnight. By morning they have 4,000 articles in a folder — it feels like progress. Meanwhile, someone else spends thirty minutes picking five solid sources for their exact topic, writes a scraper that only touches those five, and stops there.
 
 Guess whose pipeline actually produces usable, accurate content? Not the guy with 4,000 files. His folder is full of duplicate stories, reposted press releases, comment sections that got scraped by mistake, some random cooking blog that got mixed in because it happened to mention the same keyword once, and articles from sources that are honestly just... not reliable. Somewhere in that mess there's probably good information. But "probably somewhere in this mess" is not grounding — that's just a bigger, messier version of the exact hallucination problem Chapter 1 already warned you about, except now instead of the model making things up, it's confidently repeating garbage that a bad source made up first.
 
@@ -51,18 +51,18 @@ Found 187 headlines
 Now here's the disciplined version — same tools, completely different targeting. In the final pipeline this becomes [`code/scrape.py`](../code/scrape.py):
 
 ```python
-# scrape.py — excerpt; full file: code/scrape.py
+# scrape.py — teaching excerpt; full permanent file: code/scrape.py
 import requests
 from bs4 import BeautifulSoup
 
 class ScrapeError(Exception):
     pass
 
-def scrape_source(url, timeout=10):
+def scrape_source(url, timeout=15):
     try:
         page = requests.get(
             url,
-            headers={"User-Agent": "Mozilla/5.0 (compatible; GroundedPipeline/1.0)"},
+            headers={"User-Agent": "Mozilla/5.0 (compatible; GroundedPipeline/1.1)"},
             timeout=timeout,
         )
         page.raise_for_status()
@@ -79,7 +79,9 @@ def scrape_source(url, timeout=10):
             f"No article content found at {url} — page layout may have changed"
         )
 
-    return page.text
+    # Permanent module returns the article HTML only (not the full page),
+    # with retries and a short on-disk cache — see code/scrape.py.
+    return str(article)
 ```
 
 Teaching example with explicit primary sources (same idea Chapter 4 started with):

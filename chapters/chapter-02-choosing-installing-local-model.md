@@ -6,20 +6,20 @@ Code samples in this chapter are licensed separately under MIT — see /LICENSE.
 
 # Chapter 2: Choosing and Installing Your Local Model
 
-## The Model Everyone's Hyping Up Might Straight Up Not Run on Your Pi
+## The Trending Model Might Not Run on Your Pi
 
-Okay so here's a scene that happens to literally everyone starting out. You go on YouTube, you see some guy with a fancy gaming laptop saying "bro this new model is INSANE, everyone should be using it." You get hyped, you go home, you open your Raspberry Pi, you try to install that same model...
+A scene that happens to almost everyone starting out: you watch a video on a high-end machine calling some new model "the one everyone should use." You get excited, open your Raspberry Pi, and try the same model...
 
 ```bash
-$ ollama run llama3.1:70b
+$ ollama run llama3.3:70b
 
 pulling manifest
 Error: model requires more system memory (44.0 GiB) than is available (7.6 GiB)
 ```
 
-And that's it. Game over before it even started. Your Pi just looked at that 70-billion-parameter model and said "nah bro, not happening." This isn't a rare situation — this is basically what happens to every single beginner who picks a model because it's trending, instead of picking one because it actually fits their machine.
+Game over before it starts. The Pi simply cannot hold a 70-billion-parameter model in 8 GB of RAM. This is what happens when you pick a model because it is trending instead of because it fits your hardware.
 
-This is the mistake this whole chapter is trying to save you from. Choosing a model isn't a "which one is the coolest" question. It's a hardware question first, and a task-fit question second. Get those two right, and everything after this — the scraping, the prompting, the validation — actually works. Get it wrong, and you're stuck watching error messages instead of building anything.
+Choosing a model is not a "which one is coolest" question. It is a hardware question first, and a task-fit question second. Get those two right and the rest of the pipeline can work. Get them wrong and you spend your time staring at error messages.
 
 ## Why "Best Model" Is the Wrong Question
 
@@ -59,7 +59,7 @@ $ curl -fsSL https://ollama.com/install.sh | sh
 Now pull a model that's actually sized for a Pi:
 
 ```bash
-$ ollama pull llama3.2:3b
+$ ollama pull llama3.2:latest
 
 pulling manifest
 pulling dde5aa3fc5ff... 100% ▕████████████████▏ 2.0 GB
@@ -76,7 +76,7 @@ That's a 2 GB download for a model that comfortably runs inside your Pi's 8 GB o
 Now the second question — task fit. Run the model and give it something close to what your actual pipeline will need it to do:
 
 ```bash
-$ ollama run llama3.2:3b
+$ ollama run llama3.2:latest
 
 >>> Summarize this in one factual sentence, no extra commentary:
 >>> "The Reserve Bank of India kept the repo rate unchanged at 6.5%
@@ -97,7 +97,7 @@ In Chapter 3 you'll wrap the API call in `ask_model()`. In the permanent pipelin
 
 ```python
 # generate.py — excerpt; full file: code/generate.py
-def ask_model(prompt, model="llama3.2:3b", base_url="http://localhost:11434"):
+def ask_model(prompt, model="llama3.2:latest", base_url="http://localhost:11434"):
     response = requests.post(
         f"{base_url}/api/generate",
         json={"model": model, "prompt": prompt, "stream": False},
@@ -107,7 +107,7 @@ def ask_model(prompt, model="llama3.2:3b", base_url="http://localhost:11434"):
     return response.json()["response"]
 ```
 
-[`run_pipeline.py`](../code/run_pipeline.py) can pass a different `model=` if you ever switch. Default stays whatever you validated in this chapter — typically `llama3.2:3b` on an 8 GB Pi.
+[`run_pipeline.py`](../code/run_pipeline.py) can pass a different `model=` if you ever switch. Default stays whatever you validated in this chapter — typically `llama3.2:latest` on an 8 GB Pi.
 
 You do not need a separate model-selection module. Hardware fit is a decision you make once; the code just uses the name you chose.
 
@@ -116,13 +116,13 @@ You do not need a separate model-selection module. Hardware fit is a decision yo
 Totally fair thing to think — "bigger is smarter, so let me just squeeze in the biggest one that technically loads." Let's actually test that logic instead of just arguing about it.
 
 ```bash
-$ ollama pull llama3.1:8b
+$ ollama pull qwen2.5:7b
 
 pulling manifest
-pulling 8eeb52dfb3bb... 100% ▕████████████████▏ 4.7 GB
+pulling ... 100% ▕████████████████▏ ~4.7 GB
 success
 
-$ time ollama run llama3.1:8b "Summarize this in one sentence:
+$ time ollama run qwen2.5:7b "Summarize this in one sentence:
 The Reserve Bank of India kept the repo rate unchanged at 6.5%."
 
 The RBI kept the repo rate steady at 6.5%, its latest monetary
@@ -132,9 +132,9 @@ pressures and a measured approach to economic stability.
 real    0m47.312s
 ```
 
-Compare that to the 3b model from earlier, which gave a similarly correct answer in a fraction of that time, using less than half the RAM, with less risk of your Pi's fans screaming and the whole system slowing down while it's thinking. Yes, technically the 8b model "fits" — barely, if nothing else is running, and if you're patient. But here's the thing this book cares about: your pipeline isn't going to run once. It's going to run automatically, over and over, on a schedule, probably alongside a scraper and a renderer that also need CPU and memory. A model that just barely squeezes in when it's the only thing running is going to be a nightmare once it's one piece of a five-part automated system. "Barely fits alone" is not the same as "fits inside a pipeline," and that difference is going to matter a lot more in Chapter 9 than it does right now.
+Compare that to `llama3.2:latest` from earlier, which gave a similarly correct answer in a fraction of that time, using less RAM, with less risk of the Pi overheating and the whole system slowing down while it thinks. Yes, technically a 7–8B model often "fits" — barely, if nothing else is running, and if you're patient. But here's the thing this book cares about: your pipeline isn't going to run once. It's going to run automatically, over and over, on a schedule, probably alongside a scraper and a renderer that also need CPU and memory. A model that just barely squeezes in when it's the only thing running is going to be a nightmare once it's one piece of a five-part automated system. "Barely fits alone" is not the same as "fits inside a pipeline," and that difference is going to matter a lot more in Chapter 9 than it does right now.
 
-The honest answer is: pick the smallest model that still does your specific task well. Not the smallest one period, and not the biggest one that technically loads — the smallest one that still gives you output you're happy with, for the exact narrow job you're asking it to do. For a pipeline built around short, factual, source-anchored writing, that's very often a 3b model, not an 8b one. Save the bigger stuff for when you genuinely need heavier reasoning, and even then — think hard before running it on a Pi at all.
+The honest answer is: pick the smallest model that still does your specific task well. Not the smallest one period, and not the biggest one that technically loads — the smallest one that still gives you output you're happy with, for the exact narrow job you're asking it to do. For a pipeline built around short, factual, source-anchored writing, that's very often `llama3.2:latest` (a 3B-class model), not a 7–8B one. Save the bigger stuff for when you genuinely need heavier reasoning, and even then — think hard before running it on a Pi at all.
 
 ## Where This Fits in the Final Pipeline
 
@@ -152,7 +152,7 @@ This chapter has no permanent stage file of its own. It decides the default `mod
 
 Picking a local model isn't about chasing whatever's trending — it's a two-part decision that actually determines whether your pipeline runs at all. First, check your hardware honestly with something like `free -h`, and match the model's size to what you actually have available, because no clever prompt fixes a model that literally can't fit in RAM. Second, test the model against the actual task you need it to do — short, factual, structured output, in this book's case — instead of judging it on how impressive or creative it sounds in general. And bigger isn't automatically better: a model that barely fits when it's running alone is going to cause real problems once it becomes one part of a bigger automated system.
 
-Default used in the permanent code: `llama3.2:3b` (change the `model=` argument in [`generate.py`](../code/generate.py) / [`run_pipeline.py`](../code/run_pipeline.py) if your hardware or task needs something else).
+Default used in the permanent code: `llama3.2:latest` (change the `model=` argument in [`generate.py`](../code/generate.py) / [`run_pipeline.py`](../code/run_pipeline.py) if your hardware or task needs something else).
 
 ## Bridge to Chapter 3
 

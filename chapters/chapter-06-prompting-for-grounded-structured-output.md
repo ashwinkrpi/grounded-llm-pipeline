@@ -127,7 +127,9 @@ SOURCE: {source_chunk}
 QUESTION: {question}"""
 ```
 
-Chapter 9's orchestrator [`run_pipeline.py`](../code/run_pipeline.py) calls `build_prompt(chunks[0])` then `ask_model(...)`. You do not need the `--prompt-file` style flags from the teaching examples once you are on the permanent modules — those were shorthand for "behavior," not a finished CLI.
+Chapter 9's orchestrator [`run_pipeline.py`](../code/run_pipeline.py) selects the best chunk (via `select_best_chunk`), calls `build_prompt(...)`, then `ask_model(...)`. You do not need the `--prompt-file` style flags from the teaching examples once you are on the permanent modules — those were shorthand for behavior, not a finished CLI.
+
+**Permanent vs teaching:** the live `build_prompt()` in [`code/generate.py`](../code/generate.py) also includes rule 5 (natural tone while keeping bracketed quotes). Teaching snippets in this chapter may show a shorter rule list; the permanent file is the source of truth.
 
 ## The Objection: "Doesn't All This Rule-Writing Make the Output Sound Robotic and Stiff?"
 

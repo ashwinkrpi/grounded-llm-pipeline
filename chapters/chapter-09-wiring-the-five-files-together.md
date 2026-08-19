@@ -57,90 +57,48 @@ From here on, these are the real names you'll keep using.
 
 ### `scrape.py` — only scraping, fail clearly
 
+Core idea (full permanent file: [`code/scrape.py`](../code/scrape.py)):
+
 ```python
-# scrape.py — full file: code/scrape.py
-import requests
-from bs4 import BeautifulSoup
-
-class ScrapeError(Exception):
-    pass
-
-def scrape_source(url):
-    try:
-        page = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
-        page.raise_for_status()
-    except requests.RequestException as e:
-        raise ScrapeError(f"Could not reach {url}: {e}")
-
-    soup = BeautifulSoup(page.text, "html.parser")
-    article = soup.find("article")
-    if not article or not article.get_text(strip=True):
-        raise ScrapeError(f"No article content found at {url} — page layout may have changed")
-
-    return page.text
+def scrape_source(url, timeout=15, retries=2, use_cache=True) -> str:
+    # GET with retries + short on-disk cache
+    # Find <article> (or main / content / body)
+    # Return article HTML only — not the full page
+    ...
 ```
 
-See the complete module: [`code/scrape.py`](../code/scrape.py).
+**What changed for the permanent version:** teaching snippets in Chapter 4 returned full `page.text`. The permanent module returns the article subtree only, retries transient network errors, and caches successful responses for a few hours (disable with `--no-cache`).
 
 ### `structure.py` — only cleaning and chunking
 
+Core idea (full permanent file: [`code/structure.py`](../code/structure.py)):
+
 ```python
-# structure.py — full file: code/structure.py
-from bs4 import BeautifulSoup
+def clean_and_chunk(raw_html, chunk_size=300, overlap=50) -> tuple[str, list[str]]:
+    # Strip nav/header/footer/script/style
+    # Extract paragraphs, chunk with overlap
+    ...
 
-class StructureError(Exception):
-    pass
-
-def clean_and_chunk(raw_html, chunk_size=300, overlap=50):
-    soup = BeautifulSoup(raw_html, "html.parser")
-    for tag in soup(["nav", "header", "footer", "script", "style"]):
-        tag.decompose()
-
-    article = soup.find("article")
-    if not article:
-        raise StructureError("No <article> tag found after cleaning")
-
-    paragraphs = [p.get_text(strip=True) for p in article.find_all("p")]
-    text = "\n".join(p for p in paragraphs if len(p) > 20)
-    if not text:
-        raise StructureError("Article found but contained no usable paragraphs")
-
-    words = text.split()
-    chunks, start = [], 0
-    while start < len(words):
-        end = start + chunk_size
-        chunks.append(" ".join(words[start:end]))
-        start = end - overlap
-    return text, chunks
+def select_best_chunk(chunks, question=None) -> str:
+    # Prefer the chunk that best matches the question terms
+    ...
 ```
 
-See the complete module: [`code/structure.py`](../code/structure.py).
+**What changed for the permanent version:** the orchestrator no longer always uses `chunks[0]`. It calls `select_best_chunk()` so longer pages still feed the most relevant context into generation.
 
 ### `generate.py` — prompt + model call
 
-Chapter 3's `ask_model()` moves here unchanged. This file also needs one thing Chapter 3 never built as reusable code: a `build_prompt()` function that assembles Chapter 6's grounding rules around whatever chunk gets handed to it.
+Chapter 3's `ask_model()` lives here with env-var defaults. Chapter 6's rules live in `build_prompt()`:
 
 ```python
-# generate.py — full file: code/generate.py
-import requests
+# generate.py — excerpt; full file: code/generate.py
+def ask_model(prompt, model=None, base_url=None) -> str:
+    model = model or os.environ.get("GROUNDED_MODEL", "llama3.2:latest")
+    ...
 
-def ask_model(prompt, model="llama3.2:3b"):
-    response = requests.post(
-        "http://localhost:11434/api/generate",
-        json={"model": model, "prompt": prompt, "stream": False},
-    )
-    return response.json()["response"]
-
-def build_prompt(source_chunk):
-    return f"""You are answering strictly from the SOURCE text below. Rules:
-1. Only state facts that appear word-for-word or near word-for-word in SOURCE.
-2. For every fact you state, quote the exact phrase from SOURCE it came from, in brackets.
-3. If SOURCE does not contain the answer, respond with exactly: 'Not stated in source.'
-4. Do not add outlook, predictions, or analysis not present in SOURCE.
-
-SOURCE: {source_chunk}
-
-QUESTION: Summarize the key fact in this source."""
+def build_prompt(source_chunk, question=None) -> str:
+    # Strict grounding rules + SOURCE + QUESTION
+    ...
 ```
 
 See the complete module: [`code/generate.py`](../code/generate.py).
@@ -215,19 +173,21 @@ Compare that to the earlier `AttributeError` buried three files deep. This tells
 
 | File | Job |
 |------|-----|
-| [`scrape.py`](../code/scrape.py) | Fetch page; raise `ScrapeError` on failure |
-| [`structure.py`](../code/structure.py) | Clean + chunk; raise `StructureError` on failure |
-| [`generate.py`](../code/generate.py) | Build grounded prompt + call Ollama |
+| [`scrape.py`](../code/scrape.py) | Fetch article HTML; retries + cache; raise `ScrapeError` |
+| [`structure.py`](../code/structure.py) | Clean + chunk; `select_best_chunk`; raise `StructureError` |
+| [`generate.py`](../code/generate.py) | `build_prompt` + `ask_model` (env-aware defaults) |
 | [`validator.py`](../code/validator.py) | Low-level quote matching |
-| [`validate_response.py`](../code/validate_response.py) | Extract citations; approve or reject |
-| [`render_card.py`](../code/render_card.py) | Turn approved text into a square image card |
-| [`run_pipeline.py`](../code/run_pipeline.py) | Orchestrator — calls the stages in order |
+| [`validate_response.py`](../code/validate_response.py) | Extract citations; approve, reject, or accept "Not stated in source." |
+| [`render_card.py`](../code/render_card.py) | Dynamic layout card image |
+| [`run_pipeline.py`](../code/run_pipeline.py) | Orchestrator — CLI, logging, stage failures |
+
+Teaching excerpts in earlier chapters are simplified on purpose. When behavior differs, the permanent file in `code/` wins — each chapter that introduces a stage notes the main differences.
 
 ## The Objection: "Isn't Five Separate Files Just More Complexity for No Real Benefit?"
 
 Reasonable pushback — one file is simpler to read top to bottom, one file is easier to find things in, so why deliberately split working code into five pieces that now have to import from each other?
 
-Let's actually test the claim that one file is easier to work with, using a real scenario: your model choice changes. Say you switch from `llama3.2:3b` to a different model in Chapter 2's family, and you need to update how prompts get built.
+Let's actually test the claim that one file is easier to work with, using a real scenario: your model choice changes. Say you switch from `llama3.2:latest` to a different model in Chapter 2's family, and you need to update how prompts get built.
 
 With the five-file structure, the fix is exactly one line, in exactly one file, [`generate.py`](../code/generate.py), and nothing else in the pipeline needs to be touched, read, or even understood to make that change safely. With the single `everything.py` file from the top of this chapter, that same change means scrolling through scraping logic, cleaning logic, and rendering logic just to find the one relevant line — and worse, it means any typo you make while scrolling past unrelated code risks breaking a completely different stage by accident, since it's all sharing the same file and the same variable scope. Five files aren't more complex. They're the same complexity, organized so that each piece of it stays contained instead of leaking into everything else.
 
