@@ -92,3 +92,11 @@ See the license header at the top of each chapter and the root `LICENSE` file fo
 2. Type the code yourself as you go (the learning happens in the typing).
 3. When you reach Chapter 9, switch to the assembled files in `code/` and run the full pipeline.
 4. Adapt the two knobs (source URLs + question) for your own niche (Chapter 11).
+
+---
+
+## 🤝 contributing
+
+This is a personal project and doesn't accept pull requests; only collaborators can open them.
+You're welcome to fork it and adapt it for your own niche, and corrections or bug reports in
+[Issues](https://github.com/ashwinkrpi/grounded-llm-pipeline/issues) are appreciated.
